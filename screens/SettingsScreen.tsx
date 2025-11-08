@@ -1,9 +1,22 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Switch, ScrollView } from 'react-native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-export default function SettingsScreen({ navigation }) {
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [darkModeEnabled, setDarkModeEnabled] = useState(false);
+type RootStackParamList = {
+  Home: undefined;
+  About: undefined;
+  Settings: undefined;
+};
+
+type SettingsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Settings'>;
+
+interface SettingsScreenProps {
+  navigation: SettingsScreenNavigationProp;
+}
+
+export default function SettingsScreen({ navigation }: SettingsScreenProps) {
+  const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
+  const [darkModeEnabled, setDarkModeEnabled] = useState<boolean>(false);
   
   return (
     <ScrollView style={styles.scrollView}>

@@ -1,7 +1,7 @@
 {
   "name": "homekeep",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "index.tsx",
   "scripts": {
     "start": "expo start",
     "android": "expo start --android",
@@ -20,5 +20,10 @@
     "react-native-screens": "~4.16.0",
     "react-native-web": "~0.21.0"
   },
-  "private": true
+  "private": true,
+  "devDependencies": {
+    "@types/react": "^19.2.2",
+    "@types/react-native": "^0.72.8",
+    "typescript": "^5.9.3"
+  }
 }

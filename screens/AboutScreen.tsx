@@ -1,7 +1,20 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView } from 'react-native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 
-export default function AboutScreen({ navigation }) {
+type RootStackParamList = {
+  Home: undefined;
+  About: undefined;
+  Settings: undefined;
+};
+
+type AboutScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'About'>;
+
+interface AboutScreenProps {
+  navigation: AboutScreenNavigationProp;
+}
+
+export default function AboutScreen({ navigation }: AboutScreenProps) {
   return (
     <ScrollView style={styles.scrollView}>
       <View style={styles.container}>

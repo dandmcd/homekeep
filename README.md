@@ -1,6 +1,6 @@
 # Homekeep
 
-A React Native Expo application for home management and maintenance tracking.
+A React Native Expo application for home management and maintenance tracking, built with TypeScript.
 
 ## Features
 
@@ -47,13 +47,14 @@ npm run web      # Web browser
 
 ```
 homekeep/
-├── screens/           # App screens
-│   ├── HomeScreen.js
-│   ├── AboutScreen.js
-│   └── SettingsScreen.js
+├── screens/           # App screens (TypeScript)
+│   ├── HomeScreen.tsx
+│   ├── AboutScreen.tsx
+│   └── SettingsScreen.tsx
 ├── assets/           # Images and other assets
-├── App.js            # Main app component with navigation
+├── App.tsx           # Main app component with navigation
 ├── app.json          # Expo configuration
+├── tsconfig.json     # TypeScript configuration
 └── package.json      # Project dependencies
 ```
 
@@ -61,6 +62,7 @@ homekeep/
 
 - React Native
 - Expo SDK 54
+- TypeScript
 - React Navigation
 - React Native Screens
 - React Native Safe Area Context
