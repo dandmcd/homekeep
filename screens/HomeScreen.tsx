@@ -1,6 +1,11 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Box } from '@/components/ui/box';
+import { Text } from '@/components/ui/text';
+import { Heading } from '@/components/ui/heading';
+import { Button, ButtonText } from '@/components/ui/button';
+import { VStack } from '@/components/ui/vstack';
+import { Center } from '@/components/ui/center';
 
 type RootStackParamList = {
   Home: undefined;
@@ -16,63 +21,29 @@ interface HomeScreenProps {
 
 export default function HomeScreen({ navigation }: HomeScreenProps) {
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Welcome to Homekeep!</Text>
-      <Text style={styles.subtitle}>Your home management companion</Text>
-      
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={styles.button}
+    <Center className="flex-1 bg-background-50 p-5">
+      <Heading size="2xl" className="text-typography-900 mb-2.5">Welcome to Homekeep!</Heading>
+      <Text size="lg" className="text-typography-500 mb-10 text-center">Your home management companion</Text>
+
+      <VStack space="md" className="w-full max-w-[300px]">
+        <Button
+          size="xl"
+          variant="solid"
+          action="primary"
           onPress={() => navigation.navigate('About')}
         >
-          <Text style={styles.buttonText}>Learn More</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity
-          style={styles.button}
+          <ButtonText>Learn More</ButtonText>
+        </Button>
+
+        <Button
+          size="xl"
+          variant="solid"
+          action="primary"
           onPress={() => navigation.navigate('Settings')}
         >
-          <Text style={styles.buttonText}>Settings</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
+          <ButtonText>Settings</ButtonText>
+        </Button>
+      </VStack>
+    </Center>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f5f5f5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 20,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 10,
-  },
-  subtitle: {
-    fontSize: 18,
-    color: '#666',
-    marginBottom: 40,
-    textAlign: 'center',
-  },
-  buttonContainer: {
-    width: '100%',
-    maxWidth: 300,
-  },
-  button: {
-    backgroundColor: '#007AFF',
-    padding: 15,
-    borderRadius: 10,
-    marginVertical: 8,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-  },
-});
