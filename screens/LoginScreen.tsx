@@ -5,8 +5,9 @@ import { Heading } from "@/components/ui/heading";
 import { Button, ButtonText } from "@/components/ui/button";
 import { VStack } from "@/components/ui/vstack";
 import { Center } from "@/components/ui/center";
+import { Spinner } from "@/components/ui/spinner";
 import { useAuth } from "@/contexts/AuthContext";
-import { ActivityIndicator, Alert } from "react-native";
+import { Alert } from "react-native";
 
 export default function LoginScreen() {
     const { signInWithGoogle, loading } = useAuth();
@@ -29,7 +30,7 @@ export default function LoginScreen() {
     if (loading) {
         return (
             <Center className="flex-1 bg-background-50">
-                <ActivityIndicator size="large" />
+                <Spinner size="lg" />
             </Center>
         );
     }
@@ -53,7 +54,7 @@ export default function LoginScreen() {
                     className="w-full"
                 >
                     {isSigningIn ? (
-                        <ActivityIndicator color="white" />
+                        <Spinner size="sm" color="white" />
                     ) : (
                         <ButtonText>Sign in with Google</ButtonText>
                     )}

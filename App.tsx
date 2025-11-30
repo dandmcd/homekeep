@@ -3,14 +3,16 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { ActivityIndicator, View } from 'react-native';
 
 import HomeScreen from './screens/HomeScreen';
 import AboutScreen from './screens/AboutScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import LoginScreen from './screens/LoginScreen';
+import CoreTasksScreen from './screens/CoreTasksScreen';
 
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
+import { Center } from '@/components/ui/center';
+import { Spinner } from '@/components/ui/spinner';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import '@/global.css';
 
@@ -19,6 +21,7 @@ export type RootStackParamList = {
   Home: undefined;
   About: undefined;
   Settings: undefined;
+  CoreTasks: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -28,9 +31,9 @@ function Navigation() {
 
   if (loading) {
     return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-        <ActivityIndicator size="large" />
-      </View>
+      <Center className="flex-1">
+        <Spinner size="lg" />
+      </Center>
     );
   }
 
@@ -63,6 +66,11 @@ function Navigation() {
             name="Settings"
             component={SettingsScreen}
             options={{ title: 'Settings' }}
+          />
+          <Stack.Screen
+            name="CoreTasks"
+            component={CoreTasksScreen}
+            options={{ title: 'Core Tasks' }}
           />
         </>
       ) : (

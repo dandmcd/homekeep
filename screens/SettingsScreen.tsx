@@ -13,6 +13,7 @@ type RootStackParamList = {
   Home: undefined;
   About: undefined;
   Settings: undefined;
+  CoreTasks: undefined;
 };
 
 type SettingsScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Settings'>;
@@ -70,6 +71,16 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           <Pressable className="py-4 border-b border-outline-100">
             <HStack className="justify-between items-center">
               <Text size="md" className="text-typography-900">Data & Storage</Text>
+              <Text size="xl" className="text-typography-400">›</Text>
+            </HStack>
+          </Pressable>
+
+          <Pressable 
+            className="py-4 border-b border-outline-100"
+            onPress={() => navigation.navigate('CoreTasks')}
+          >
+            <HStack className="justify-between items-center">
+              <Text size="md" className="text-typography-900">Core Tasks</Text>
               <Text size="xl" className="text-typography-400">›</Text>
             </HStack>
           </Pressable>
