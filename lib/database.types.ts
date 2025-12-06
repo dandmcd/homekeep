@@ -52,3 +52,26 @@ export const frequencyOrder: Frequency[] = [
   'semi_annual',
   'annual',
 ];
+
+/**
+ * User profile for tracking initialization state
+ */
+export interface UserProfile {
+  id: string;
+  user_id: string;
+  initialized: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+/**
+ * User's assigned task (copy of core task for the user)
+ */
+export interface UserTask {
+  id: string;
+  user_id: string;
+  core_task_id: string;
+  created_at: string;
+  // Joined data from core_tasks
+  core_task?: CoreTask;
+}

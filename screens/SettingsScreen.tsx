@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { Alert, Platform } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Box } from '@/components/ui/box';
 import { Text } from '@/components/ui/text';
@@ -8,6 +9,8 @@ import { ScrollView } from '@/components/ui/scroll-view';
 import { Switch } from '@/components/ui/switch';
 import { HStack } from '@/components/ui/hstack';
 import { Pressable } from '@/components/ui/pressable';
+import { Spinner } from '@/components/ui/spinner';
+import { useAuth } from '@/contexts/AuthContext';
 
 type RootStackParamList = {
   Home: undefined;
@@ -23,8 +26,70 @@ interface SettingsScreenProps {
 }
 
 export default function SettingsScreen({ navigation }: SettingsScreenProps) {
+  const { resetAccount, initializingTasks, signOut } = useAuth();
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
   const [darkModeEnabled, setDarkModeEnabled] = useState<boolean>(false);
+  const [isResetting, setIsResetting] = useState<boolean>(false);
+
+  const handleResetAccount = () => {
+    const performReset = async () => {
+      try {
+        setIsResetting(true);
+        await resetAccount();
+        if (Platform.OS === 'web') {
+          window.alert('Your account has been reset with fresh tasks.');
+        } else {
+          Alert.alert('Success', 'Your account has been reset with fresh tasks.');
+        }
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'Failed to reset account';
+        if (Platform.OS === 'web') {
+          window.alert(message);
+        } else {
+          Alert.alert('Error', message);
+        }
+      } finally {
+        setIsResetting(false);
+      }
+    };
+
+    if (Platform.OS === 'web') {
+      const confirmed = window.confirm(
+        'Reset Account\n\nThis will delete all your tasks and restore the default core tasks. This action cannot be undone.'
+      );
+      if (confirmed) {
+        void performReset();
+      }
+      return;
+    }
+
+    Alert.alert(
+      'Reset Account',
+      'Are you sure you want to reset your account? This will delete all your tasks and restore the default core tasks. This action cannot be undone.',
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel',
+        },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: () => void performReset(),
+        },
+      ]
+    );
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      Alert.alert(
+        'Error',
+        error instanceof Error ? error.message : 'Failed to sign out'
+      );
+    }
+  };
 
   return (
     <ScrollView className="flex-1 bg-background-50">
@@ -85,6 +150,38 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
             </HStack>
           </Pressable>
         </Box>
+
+        <Box className="bg-white p-4 rounded-lg mb-4 border border-error-200">
+          <Heading size="md" className="text-error-600 mb-2.5">Danger Zone</Heading>
+
+          <Button
+            size="lg"
+            variant="outline"
+            action="negative"
+            className="w-full"
+            onPress={handleResetAccount}
+            disabled={isResetting || initializingTasks}
+          >
+            {isResetting || initializingTasks ? (
+              <Spinner size="sm" color="#dc2626" />
+            ) : (
+              <ButtonText>Reset Account</ButtonText>
+            )}
+          </Button>
+          <Text size="xs" className="text-typography-400 mt-2 text-center">
+            This will delete all your tasks and restore defaults
+          </Text>
+        </Box>
+
+        <Button
+          size="lg"
+          variant="outline"
+          action="secondary"
+          className="mb-4"
+          onPress={handleSignOut}
+        >
+          <ButtonText>Sign Out</ButtonText>
+        </Button>
 
         <Button
           size="xl"
