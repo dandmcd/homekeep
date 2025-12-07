@@ -70,7 +70,9 @@ export interface UserProfile {
 export interface UserTask {
   id: string;
   user_id: string;
-  core_task_id: string;
+  core_task_id: string | null;
+  name?: string;
+  frequency?: Frequency;
   created_at: string;
   // Joined data from core_tasks
   core_task?: CoreTask;

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Alert, Platform } from 'react-native';
+import { Alert, Platform, TextInput } from 'react-native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Box } from '@/components/ui/box';
 import { Text } from '@/components/ui/text';
@@ -13,7 +13,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { Pressable } from '@/components/ui/pressable';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
-import { UserTask, frequencyLabels, Frequency } from '@/lib/database.types';
+import { UserTask, frequencyLabels, Frequency, frequencyOrder } from '@/lib/database.types';
 
 type RootStackParamList = {
   Home: undefined;
@@ -34,6 +34,9 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null);
+  const [newTaskName, setNewTaskName] = useState('');
+  const [newTaskFrequency, setNewTaskFrequency] = useState<Frequency>('weekly');
+  const [isAdding, setIsAdding] = useState(false);
 
   useEffect(() => {
     async function fetchUserTasks() {
@@ -60,6 +63,8 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             id,
             user_id,
             core_task_id,
+            name,
+            frequency,
             created_at,
             core_task:core_tasks (
               id,
@@ -82,6 +87,8 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           id: item.id,
           user_id: item.user_id,
           core_task_id: item.core_task_id,
+          name: item.name,
+          frequency: item.frequency,
           created_at: item.created_at,
           core_task: item.core_task,
         }));
@@ -97,6 +104,68 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
     fetchUserTasks();
   }, [user, isInitialized]);
+
+  const handleAddTask = async () => {
+    if (!newTaskName.trim() || !user) return;
+    
+    setIsAdding(true);
+    try {
+      // Insert directly into user_tasks for custom tasks
+      const { data: userTaskData, error: userTaskError } = await supabase
+        .from('user_tasks')
+        .insert({
+          user_id: user.id,
+          name: newTaskName.trim(),
+          frequency: newTaskFrequency,
+          // core_task_id is null for custom tasks
+        })
+        .select(`
+          id,
+          user_id,
+          core_task_id,
+          name,
+          frequency,
+          created_at,
+          core_task:core_tasks (
+            id,
+            name,
+            frequency,
+            created_at
+          )
+        `)
+        .single();
+        
+      if (userTaskError) throw userTaskError;
+      
+      // Update local state
+      const newTask: UserTask = {
+        id: userTaskData.id,
+        user_id: userTaskData.user_id,
+        core_task_id: userTaskData.core_task_id,
+        name: userTaskData.name ?? undefined,
+        frequency: (userTaskData.frequency as Frequency) ?? undefined,
+        created_at: userTaskData.created_at,
+        core_task: Array.isArray(userTaskData.core_task) ? userTaskData.core_task[0] : userTaskData.core_task,
+      };
+
+      setTasks(prev => [...prev, newTask]);
+      setNewTaskName('');
+      setNewTaskFrequency('weekly');
+      
+    } catch (err) {
+      console.error('Error adding task:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to add task';
+      if (Platform.OS === 'web') {
+        window.alert(errorMessage);
+      } else {
+        Alert.alert('Error', errorMessage);
+      }
+    } finally {
+      setIsAdding(false);
+    }
+  };
+
+
 
   const handleDeleteTask = (task: UserTask) => {
     const taskName = task.core_task?.name || 'this task';
@@ -203,6 +272,66 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           {tasks.length} tasks assigned to your account
         </Text>
 
+        <Box className="bg-white p-4 rounded-lg mb-6">
+          <Heading size="md" className="mb-3">Add New Task</Heading>
+          <VStack space="md">
+            <TextInput
+              placeholder="Task Name"
+              value={newTaskName}
+              onChangeText={setNewTaskName}
+              style={{
+                borderWidth: 1,
+                borderColor: '#e5e5e5',
+                padding: 12,
+                borderRadius: 8,
+                fontSize: 16,
+              }}
+            />
+            
+            <Box>
+              <Text size="xs" className="mb-2 text-typography-500">Frequency</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                <HStack space="sm" className="pb-2">
+                  {frequencyOrder.map((freq) => (
+                    <Pressable
+                      key={freq}
+                      onPress={() => setNewTaskFrequency(freq)}
+                      className={`px-3 py-2 rounded-full border ${
+                        newTaskFrequency === freq
+                          ? 'bg-primary-500 border-primary-500'
+                          : 'bg-white border-outline-200'
+                      }`}
+                    >
+                      <Text
+                        size="xs"
+                        className={
+                          newTaskFrequency === freq ? 'text-white' : 'text-typography-600'
+                        }
+                      >
+                        {frequencyLabels[freq]}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </HStack>
+              </ScrollView>
+            </Box>
+
+            <Button
+              size="md"
+              variant="solid"
+              action="primary"
+              onPress={handleAddTask}
+              isDisabled={isAdding || !newTaskName.trim()}
+            >
+              {isAdding ? (
+                <Spinner color="white" />
+              ) : (
+                <ButtonText>Add Task</ButtonText>
+              )}
+            </Button>
+          </VStack>
+        </Box>
+
         {tasks.length === 0 ? (
           <Center className="py-10">
             <Text size="lg" className="text-typography-400">
@@ -222,11 +351,11 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                 <HStack className="justify-between items-center">
                   <VStack space="xs" className="flex-1 mr-3">
                     <Text size="md" className="text-typography-900 font-medium">
-                      {task.core_task?.name || 'Unknown Task'}
+                      {task.name || task.core_task?.name || 'Unknown Task'}
                     </Text>
                     <Text size="sm" className="text-typography-500">
-                      {task.core_task?.frequency 
-                        ? frequencyLabels[task.core_task.frequency as Frequency] 
+                      {(task.frequency || task.core_task?.frequency) 
+                        ? frequencyLabels[(task.frequency || task.core_task?.frequency) as Frequency] 
                         : 'Unknown frequency'}
                     </Text>
                   </VStack>
