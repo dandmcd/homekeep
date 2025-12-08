@@ -9,6 +9,7 @@ import AboutScreen from './screens/AboutScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import LoginScreen from './screens/LoginScreen';
 import CoreTasksScreen from './screens/CoreTasksScreen';
+import CalendarScreen from './screens/CalendarScreen';
 
 import { GluestackUIProvider } from '@/components/ui/gluestack-ui-provider';
 import { Center } from '@/components/ui/center';
@@ -22,6 +23,7 @@ export type RootStackParamList = {
   About: undefined;
   Settings: undefined;
   CoreTasks: undefined;
+  Calendar: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -71,6 +73,11 @@ function Navigation() {
             name="CoreTasks"
             component={CoreTasksScreen}
             options={{ title: 'Core Tasks' }}
+          />
+          <Stack.Screen
+            name="Calendar"
+            component={CalendarScreen}
+            options={{ title: 'Schedule' }}
           />
         </>
       ) : (

@@ -20,6 +20,7 @@ type RootStackParamList = {
   About: undefined;
   Settings: undefined;
   CoreTasks: undefined;
+  Calendar: undefined;
 };
 
 type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
@@ -41,13 +42,13 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   useEffect(() => {
     async function fetchUserTasks() {
       console.log('HomeScreen effect - user:', !!user, 'isInitialized:', isInitialized);
-      
+
       if (!user) {
         console.log('No user, skipping fetch');
         setLoading(false);
         return;
       }
-      
+
       if (!isInitialized) {
         console.log('User not initialized yet, skipping fetch');
         setLoading(false);
@@ -107,7 +108,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
   const handleAddTask = async () => {
     if (!newTaskName.trim() || !user) return;
-    
+
     setIsAdding(true);
     try {
       // Insert directly into user_tasks for custom tasks
@@ -134,9 +135,9 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           )
         `)
         .single();
-        
+
       if (userTaskError) throw userTaskError;
-      
+
       // Update local state
       const newTask: UserTask = {
         id: userTaskData.id,
@@ -151,7 +152,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       setTasks(prev => [...prev, newTask]);
       setNewTaskName('');
       setNewTaskFrequency('weekly');
-      
+
     } catch (err) {
       console.error('Error adding task:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to add task';
@@ -169,11 +170,11 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
   const handleDeleteTask = (task: UserTask) => {
     const taskName = task.core_task?.name || 'this task';
-    
+
     const performDelete = async () => {
       try {
         setDeletingTaskId(task.id);
-        
+
         const { error: deleteError } = await supabase
           .from('user_tasks')
           .delete()
@@ -287,7 +288,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                 fontSize: 16,
               }}
             />
-            
+
             <Box>
               <Text size="xs" className="mb-2 text-typography-500">Frequency</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -296,11 +297,10 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                     <Pressable
                       key={freq}
                       onPress={() => setNewTaskFrequency(freq)}
-                      className={`px-3 py-2 rounded-full border ${
-                        newTaskFrequency === freq
-                          ? 'bg-primary-500 border-primary-500'
-                          : 'bg-white border-outline-200'
-                      }`}
+                      className={`px-3 py-2 rounded-full border ${newTaskFrequency === freq
+                        ? 'bg-primary-500 border-primary-500'
+                        : 'bg-white border-outline-200'
+                        }`}
                     >
                       <Text
                         size="xs"
@@ -354,8 +354,8 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                       {task.name || task.core_task?.name || 'Unknown Task'}
                     </Text>
                     <Text size="sm" className="text-typography-500">
-                      {(task.frequency || task.core_task?.frequency) 
-                        ? frequencyLabels[(task.frequency || task.core_task?.frequency) as Frequency] 
+                      {(task.frequency || task.core_task?.frequency)
+                        ? frequencyLabels[(task.frequency || task.core_task?.frequency) as Frequency]
                         : 'Unknown frequency'}
                     </Text>
                   </VStack>
@@ -386,6 +386,15 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             onPress={() => navigation.navigate('About')}
           >
             <ButtonText>Learn More</ButtonText>
+          </Button>
+
+          <Button
+            size="xl"
+            variant="solid"
+            action="positive"
+            onPress={() => navigation.navigate('Calendar')}
+          >
+            <ButtonText>View Schedule</ButtonText>
           </Button>
 
           <Button

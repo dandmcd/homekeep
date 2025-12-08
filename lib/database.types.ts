@@ -77,3 +77,14 @@ export interface UserTask {
   // Joined data from core_tasks
   core_task?: CoreTask;
 }
+
+export type TaskEventStatus = 'pending' | 'completed' | 'skipped';
+
+export interface TaskEvent {
+  id: string;
+  user_task_id: string;
+  due_date: string;
+  completed_at: string | null;
+  status: TaskEventStatus;
+  created_at: string;
+}

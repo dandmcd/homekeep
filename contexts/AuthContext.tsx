@@ -7,6 +7,8 @@ import React, {
 } from "react";
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
+import { generateTaskEventsForUser } from "../lib/scheduling";
+import { UserTask, CoreTask, Frequency } from "../lib/database.types";
 import * as WebBrowser from "expo-web-browser";
 import * as AuthSession from "expo-auth-session";
 import { makeRedirectUri } from "expo-auth-session";
@@ -61,10 +63,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             throw profileError;
         }
 
-        // Get all core tasks
+        // Get all core tasks with frequency
         const { data: coreTasks, error: coreTasksError } = await supabase
             .from('core_tasks')
-            .select('id');
+            .select('id, frequency');
 
         if (coreTasksError) {
             console.error('Error fetching core tasks:', coreTasksError);
@@ -73,16 +75,48 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         if (coreTasks && coreTasks.length > 0) {
             // Insert user tasks for each core task
-            const userTasks = coreTasks.map((task) => ({
+            const userTasksData = coreTasks.map((task) => ({
                 user_id: userId,
                 core_task_id: task.id,
             }));
 
-            const { error: insertError } = await supabase.from('user_tasks').insert(userTasks);
+            const { data: insertedTasks, error: insertError } = await supabase
+                .from('user_tasks')
+                .insert(userTasksData)
+                .select();
 
             if (insertError) {
                 console.error('Error inserting user tasks:', insertError);
                 throw insertError;
+            }
+
+            // Generate task events
+            if (insertedTasks) {
+                // Map frequency back to inserted tasks for the generator
+                const taskMap = new Map(coreTasks.map(ct => [ct.id, ct.frequency as Frequency]));
+                const fullTasks: UserTask[] = insertedTasks.map(t => ({
+                    id: t.id,
+                    user_id: t.user_id,
+                    core_task_id: t.core_task_id,
+                    created_at: t.created_at,
+                    core_task: {
+                        id: t.core_task_id,
+                        frequency: taskMap.get(t.core_task_id!) as Frequency,
+                    } as CoreTask
+                }));
+
+                const events = generateTaskEventsForUser(fullTasks);
+
+                if (events.length > 0) {
+                    const { error: eventError } = await supabase
+                        .from('task_events')
+                        .insert(events);
+
+                    if (eventError) {
+                        console.error('Error inserting task events:', eventError);
+                        // We don't throw here to avoid breaking the whole init flow, but log it
+                    }
+                }
             }
         }
 

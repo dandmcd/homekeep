@@ -140,7 +140,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
             </HStack>
           </Pressable>
 
-          <Pressable 
+          <Pressable
             className="py-4 border-b border-outline-100"
             onPress={() => navigation.navigate('CoreTasks')}
           >
@@ -151,16 +151,14 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           </Pressable>
         </Box>
 
-        <Box className="bg-white p-4 rounded-lg mb-4 border border-error-200">
-          <Heading size="md" className="text-error-600 mb-2.5">Danger Zone</Heading>
-
+        <Box className="mt-4">
           <Button
             size="lg"
             variant="outline"
             action="negative"
-            className="w-full"
+            className="w-full mb-4"
             onPress={handleResetAccount}
-            disabled={isResetting || initializingTasks}
+            isDisabled={isResetting || initializingTasks}
           >
             {isResetting || initializingTasks ? (
               <Spinner size="sm" color="#dc2626" />
@@ -168,30 +166,27 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
               <ButtonText>Reset Account</ButtonText>
             )}
           </Button>
-          <Text size="xs" className="text-typography-400 mt-2 text-center">
-            This will delete all your tasks and restore defaults
-          </Text>
+
+          <Button
+            size="lg"
+            variant="outline"
+            action="secondary"
+            className="w-full mb-4"
+            onPress={handleSignOut}
+          >
+            <ButtonText>Sign Out</ButtonText>
+          </Button>
+
+          <Button
+            size="xl"
+            variant="solid"
+            action="primary"
+            className="w-full"
+            onPress={() => navigation.navigate('Home')}
+          >
+            <ButtonText>Back to Home</ButtonText>
+          </Button>
         </Box>
-
-        <Button
-          size="lg"
-          variant="outline"
-          action="secondary"
-          className="mb-4"
-          onPress={handleSignOut}
-        >
-          <ButtonText>Sign Out</ButtonText>
-        </Button>
-
-        <Button
-          size="xl"
-          variant="solid"
-          action="primary"
-          className="mt-5"
-          onPress={() => navigation.navigate('Home')}
-        >
-          <ButtonText>Back to Home</ButtonText>
-        </Button>
       </Box>
     </ScrollView>
   );
