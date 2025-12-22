@@ -81,7 +81,8 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
               id,
               name,
               frequency,
-              created_at
+              created_at,
+              icon
             )
           `)
           .eq('user_id', user.id)
@@ -119,6 +120,17 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     Alert.alert('Not implemented', `Delete ${taskName} functionality coming soon in this UI.`);
   };
 
+  // Helper to render the correct icon family
+  const getTaskIcon = (iconName?: string, size = 20, color = "#5bec13") => {
+    if (!iconName) return <MaterialIcons name="cleaning-services" size={size} color={color} />;
+
+    if (iconName.startsWith('mci:')) {
+      const name = iconName.replace('mci:', '') as any;
+      return <MaterialCommunityIcons name={name} size={size} color={color} />;
+    }
+
+    return <MaterialIcons name={iconName as any} size={size} color={color} />;
+  };
 
   if (initializingTasks || loading) {
     return (
@@ -281,18 +293,27 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             </Pressable>
 
             {/* Dynamic Items from DB */}
-            {tasks.slice(0, 3).map((task) => (
-              <Pressable key={task.id} className="flex-row items-center p-3 bg-surface-light dark:bg-surface-dark rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm active:scale-[0.99] transition-transform">
-                <View className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 mr-4" />
-                <View className="flex-1">
-                  <Text className="text-base font-medium dark:text-white">{task.name || task.core_task?.name || 'Task'}</Text>
-                  <Text className="text-xs text-gray-500">{task.frequency || 'Daily'} • 15 min</Text>
-                </View>
-                <View className="w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-800 items-center justify-center">
-                  <MaterialIcons name="timer" size={20} color="#9ca3af" />
-                </View>
-              </Pressable>
-            ))}
+            {tasks.slice(0, 10).map((task) => {
+              const iconName = task.core_task?.icon;
+              return (
+                <Pressable key={task.id} className="flex-row items-center p-3 bg-surface-light dark:bg-surface-dark rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm active:scale-[0.99] transition-transform">
+                  <View className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 mr-3" />
+
+                  {/* Task Icon */}
+                  <View className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 items-center justify-center mr-3">
+                    {getTaskIcon(iconName, 16, "#555")}
+                  </View>
+
+                  <View className="flex-1">
+                    <Text className="text-base font-medium dark:text-white">{task.name || task.core_task?.name || 'Task'}</Text>
+                    <Text className="text-xs text-gray-500">{task.frequency ? frequencyLabels[task.frequency] : 'Daily'} • 15 min</Text>
+                  </View>
+                  <View className="w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-800 items-center justify-center">
+                    <MaterialIcons name="timer" size={20} color="#9ca3af" />
+                  </View>
+                </Pressable>
+              )
+            })}
 
             {tasks.length === 0 && (
               <Text className="text-gray-400 italic text-center py-4">No tasks yet. Add some!</Text>

@@ -7,6 +7,7 @@ export type Frequency =
   | 'biweekly'
   | 'monthly'
   | 'semi_monthly'
+  | 'quarterly'
   | 'seasonal_spring'
   | 'seasonal_summer'
   | 'seasonal_fall'
@@ -19,6 +20,7 @@ export interface CoreTask {
   name: string;
   frequency: Frequency;
   created_at: string;
+  icon?: string;
 }
 
 /**
@@ -29,6 +31,7 @@ export const frequencyLabels: Record<Frequency, string> = {
   biweekly: 'Every Other Week',
   monthly: 'Monthly',
   semi_monthly: 'Semi-Monthly',
+  quarterly: 'Quarterly',
   seasonal_spring: 'Spring',
   seasonal_summer: 'Summer',
   seasonal_fall: 'Fall',
@@ -45,6 +48,7 @@ export const frequencyOrder: Frequency[] = [
   'biweekly',
   'monthly',
   'semi_monthly',
+  'quarterly',
   'seasonal_spring',
   'seasonal_summer',
   'seasonal_fall',
@@ -65,7 +69,7 @@ export interface UserProfile {
 }
 
 /**
- * User's assigned task (copy of core task for the user)
+ * User's assigned task (copy of core_tasks for the user)
  */
 export interface UserTask {
   id: string;

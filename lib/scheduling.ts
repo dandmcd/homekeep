@@ -63,6 +63,9 @@ export const calculateNextOccurrences = (
                 // Add 15 days, roughly
                 current.setDate(current.getDate() + 15);
                 break;
+            case 'quarterly':
+                current.setMonth(current.getMonth() + 3);
+                break;
             case 'seasonal_spring':
             case 'seasonal_summer':
             case 'seasonal_fall':
