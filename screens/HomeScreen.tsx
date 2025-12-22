@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase';
 import { UserTask, frequencyLabels, Frequency } from '@/lib/database.types';
 import { View } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { FloatingBottomBar } from '@/components/FloatingBottomBar';
 // Custom helper component for consistent card styling
 function Card({ children, className, style }: { children: React.ReactNode; className?: string; style?: any }) {
   return (
@@ -25,6 +26,19 @@ function Card({ children, className, style }: { children: React.ReactNode; class
       {children}
     </View>
   );
+}
+
+type RootStackParamList = {
+  Home: undefined;
+  Calendar: undefined;
+  Settings: undefined;
+  CoreTasks: undefined;
+};
+
+type HomeScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Home'>;
+
+interface HomeScreenProps {
+  navigation: HomeScreenNavigationProp;
 }
 
 export default function HomeScreen({ navigation }: HomeScreenProps) {
@@ -105,20 +119,27 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     Alert.alert('Not implemented', `Delete ${taskName} functionality coming soon in this UI.`);
   };
 
+
   if (initializingTasks || loading) {
     return (
-      <Center className="flex-1 bg-background-light dark:bg-background-dark">
-        <Spinner size="lg" color="#5bec13" />
-        <Text size="md" className="text-gray-500 mt-4">Setting things up...</Text>
-      </Center>
+      <View className="flex-1 bg-background-light dark:bg-background-dark relative">
+        <Center className="flex-1">
+          <Spinner size="lg" color="#5bec13" />
+          <Text size="md" className="text-gray-500 mt-4">Setting things up...</Text>
+        </Center>
+        <FloatingBottomBar activeRoute="Home" />
+      </View>
     );
   }
 
   if (error) {
     return (
-      <Center className="flex-1 bg-background-light dark:bg-background-dark p-5">
-        <Text size="lg" className="text-red-500 text-center mb-4">{error}</Text>
-      </Center>
+      <View className="flex-1 bg-background-light dark:bg-background-dark relative">
+        <Center className="flex-1 p-5">
+          <Text size="lg" className="text-red-500 text-center mb-4">{error}</Text>
+        </Center>
+        <FloatingBottomBar activeRoute="Home" />
+      </View>
     );
   }
 
@@ -307,32 +328,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       </ScrollView>
 
       {/* Floating Action Bar */}
-      <View className="absolute bottom-6 left-0 right-0 items-center z-50 pointer-events-box-none">
-        <View className="bg-surface-light/90 dark:bg-[#1f2b18]/90 backdrop-blur-xl border border-white/20 dark:border-white/10 shadow-xl rounded-full p-2 flexDirection-row items-center justify-between flex-row min-w-[300px] px-4">
-          <Pressable className="w-12 h-12 items-center justify-center rounded-full active:bg-gray-100 dark:active:bg-zinc-800">
-            <MaterialIcons name="home" size={24} color="#5bec13" />
-          </Pressable>
-          <Pressable className="w-12 h-12 items-center justify-center rounded-full active:bg-gray-100 dark:active:bg-zinc-800" onPress={() => navigation.navigate('Calendar')}>
-            <MaterialIcons name="calendar-today" size={24} color="#9ca3af" />
-          </Pressable>
-
-          {/* Main FAB */}
-          <Pressable
-            className="w-14 h-14 bg-primary rounded-full items-center justify-center -mt-8 mb-1 border-4 border-background-light dark:border-background-dark shadow-lg active:scale-95 transition-transform"
-            style={{ shadowColor: '#5bec13', shadowOpacity: 0.4, shadowRadius: 20, elevation: 5 }}
-            onPress={() => navigation.navigate('CoreTasks')}
-          >
-            <MaterialIcons name="add" size={32} color="#131811" />
-          </Pressable>
-
-          <Pressable className="w-12 h-12 items-center justify-center rounded-full active:bg-gray-100 dark:active:bg-zinc-800">
-            <MaterialIcons name="bar-chart" size={24} color="#9ca3af" />
-          </Pressable>
-          <Pressable className="w-12 h-12 items-center justify-center rounded-full active:bg-gray-100 dark:active:bg-zinc-800" onPress={() => navigation.navigate('Settings')}>
-            <MaterialIcons name="settings" size={24} color="#9ca3af" />
-          </Pressable>
-        </View>
-      </View>
+      <FloatingBottomBar activeRoute="Home" />
     </View>
   );
 }

@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Frequency } from '@/lib/database.types';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { FloatingBottomBar } from '@/components/FloatingBottomBar';
 
 type RootStackParamList = {
     Home: undefined;
@@ -145,10 +146,13 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
 
     if (loading) {
         return (
-            <Center className="flex-1 bg-background-light dark:bg-background-dark">
-                <Spinner size="lg" color="#5bec13" />
-                <Text size="md" className="text-gray-500 mt-4">Loading schedule...</Text>
-            </Center>
+            <View className="flex-1 bg-background-light dark:bg-background-dark relative">
+                <Center className="flex-1">
+                    <Spinner size="lg" color="#5bec13" />
+                    <Text size="md" className="text-gray-500 mt-4">Loading schedule...</Text>
+                </Center>
+                <FloatingBottomBar activeRoute="Calendar" />
+            </View>
         );
     }
 
@@ -363,34 +367,9 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
                 </View>
             </ScrollView>
 
-            {/* Floating Action Button - Fixed Position */}
-            <Pressable className="absolute bottom-24 right-5 w-16 h-16 rounded-full bg-primary shadow-lg items-center justify-center z-50 active:scale-95 transition-transform" style={{ elevation: 5 }}>
-                <MaterialIcons name="add" size={32} color="#131811" />
-            </Pressable>
 
-            {/* Bottom Navigation */}
-            <View className="absolute bottom-0 z-40 w-full bg-surface-light dark:bg-surface-dark border-t border-gray-100 dark:border-white/5 pt-2 px-6 pb-6">
-                <View className="flex-row justify-between items-center">
-                    <Pressable className="items-center gap-1 w-16" onPress={() => navigation.navigate('Home')}>
-                        <MaterialIcons name="home" size={24} color="#9ca3af" />
-                        <Text className="text-[10px] font-bold text-gray-400">Home</Text>
-                    </Pressable>
-                    <Pressable className="items-center gap-1 w-16">
-                        <View className="bg-primary/20 dark:bg-primary/10 px-4 py-1 rounded-full">
-                            <MaterialIcons name="calendar-today" size={24} color="#131811" />
-                        </View>
-                        <Text className="text-[10px] font-bold text-text-main dark:text-primary">Schedule</Text>
-                    </Pressable>
-                    <Pressable className="items-center gap-1 w-16">
-                        <MaterialIcons name="inventory-2" size={24} color="#9ca3af" />
-                        <Text className="text-[10px] font-bold text-gray-400">Assets</Text>
-                    </Pressable>
-                    <Pressable className="items-center gap-1 w-16" onPress={() => navigation.navigate('Settings')}>
-                        <MaterialIcons name="settings" size={24} color="#9ca3af" />
-                        <Text className="text-[10px] font-bold text-gray-400">Settings</Text>
-                    </Pressable>
-                </View>
-            </View>
+            {/* Floating Action Bar */}
+            <FloatingBottomBar activeRoute="Calendar" />
         </View>
     );
 }

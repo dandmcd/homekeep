@@ -11,6 +11,8 @@ import { HStack } from '@/components/ui/hstack';
 import { Pressable } from '@/components/ui/pressable';
 import { Spinner } from '@/components/ui/spinner';
 import { useAuth } from '@/contexts/AuthContext';
+import { FloatingBottomBar } from '@/components/FloatingBottomBar';
+import { View } from 'react-native';
 
 type RootStackParamList = {
   Home: undefined;
@@ -92,102 +94,95 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
   };
 
   return (
-    <ScrollView className="flex-1 bg-background-50">
-      <Box className="p-5 pb-10">
-        <Heading size="xl" className="text-typography-900 mb-5 text-center">Settings</Heading>
+    <View className="flex-1 bg-background-50 relative">
+      <ScrollView className="flex-1 mb-24">
+        <Box className="p-5 pb-10">
+          <Heading size="xl" className="text-typography-900 mb-5 text-center">Settings</Heading>
 
-        <Box className="bg-white p-4 rounded-lg mb-4">
-          <Heading size="md" className="text-typography-900 mb-4">Preferences</Heading>
+          <Box className="bg-white p-4 rounded-lg mb-4">
+            <Heading size="md" className="text-typography-900 mb-4">Preferences</Heading>
 
-          <HStack className="justify-between items-center py-3 border-b border-outline-100">
-            <Text size="md" className="text-typography-900">Enable Notifications</Text>
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={setNotificationsEnabled}
-            />
-          </HStack>
+            <HStack className="justify-between items-center py-3 border-b border-outline-100">
+              <Text size="md" className="text-typography-900">Enable Notifications</Text>
+              <Switch
+                value={notificationsEnabled}
+                onValueChange={setNotificationsEnabled}
+              />
+            </HStack>
 
-          <HStack className="justify-between items-center py-3 border-b border-outline-100">
-            <Text size="md" className="text-typography-900">Dark Mode</Text>
-            <Switch
-              value={darkModeEnabled}
-              onValueChange={setDarkModeEnabled}
-            />
-          </HStack>
+            <HStack className="justify-between items-center py-3 border-b border-outline-100">
+              <Text size="md" className="text-typography-900">Dark Mode</Text>
+              <Switch
+                value={darkModeEnabled}
+                onValueChange={setDarkModeEnabled}
+              />
+            </HStack>
+          </Box>
+
+          <Box className="bg-white p-4 rounded-lg mb-4">
+            <Heading size="md" className="text-typography-900 mb-2.5">Account</Heading>
+
+            <Pressable className="py-4 border-b border-outline-100">
+              <HStack className="justify-between items-center">
+                <Text size="md" className="text-typography-900">Profile Settings</Text>
+                <Text size="xl" className="text-typography-400">›</Text>
+              </HStack>
+            </Pressable>
+
+            <Pressable className="py-4 border-b border-outline-100">
+              <HStack className="justify-between items-center">
+                <Text size="md" className="text-typography-900">Privacy & Security</Text>
+                <Text size="xl" className="text-typography-400">›</Text>
+              </HStack>
+            </Pressable>
+
+            <Pressable className="py-4 border-b border-outline-100">
+              <HStack className="justify-between items-center">
+                <Text size="md" className="text-typography-900">Data & Storage</Text>
+                <Text size="xl" className="text-typography-400">›</Text>
+              </HStack>
+            </Pressable>
+
+            <Pressable
+              className="py-4 border-b border-outline-100"
+              onPress={() => navigation.navigate('CoreTasks')}
+            >
+              <HStack className="justify-between items-center">
+                <Text size="md" className="text-typography-900">Core Tasks</Text>
+                <Text size="xl" className="text-typography-400">›</Text>
+              </HStack>
+            </Pressable>
+          </Box>
+
+          <Box className="mt-4">
+            <Button
+              size="lg"
+              variant="outline"
+              action="negative"
+              className="w-full mb-4"
+              onPress={handleResetAccount}
+              isDisabled={isResetting || initializingTasks}
+            >
+              {isResetting || initializingTasks ? (
+                <Spinner size="sm" color="#dc2626" />
+              ) : (
+                <ButtonText>Reset Account</ButtonText>
+              )}
+            </Button>
+
+            <Button
+              size="lg"
+              variant="outline"
+              action="secondary"
+              className="w-full mb-4"
+              onPress={handleSignOut}
+            >
+              <ButtonText>Sign Out</ButtonText>
+            </Button>
+          </Box>
         </Box>
-
-        <Box className="bg-white p-4 rounded-lg mb-4">
-          <Heading size="md" className="text-typography-900 mb-2.5">Account</Heading>
-
-          <Pressable className="py-4 border-b border-outline-100">
-            <HStack className="justify-between items-center">
-              <Text size="md" className="text-typography-900">Profile Settings</Text>
-              <Text size="xl" className="text-typography-400">›</Text>
-            </HStack>
-          </Pressable>
-
-          <Pressable className="py-4 border-b border-outline-100">
-            <HStack className="justify-between items-center">
-              <Text size="md" className="text-typography-900">Privacy & Security</Text>
-              <Text size="xl" className="text-typography-400">›</Text>
-            </HStack>
-          </Pressable>
-
-          <Pressable className="py-4 border-b border-outline-100">
-            <HStack className="justify-between items-center">
-              <Text size="md" className="text-typography-900">Data & Storage</Text>
-              <Text size="xl" className="text-typography-400">›</Text>
-            </HStack>
-          </Pressable>
-
-          <Pressable
-            className="py-4 border-b border-outline-100"
-            onPress={() => navigation.navigate('CoreTasks')}
-          >
-            <HStack className="justify-between items-center">
-              <Text size="md" className="text-typography-900">Core Tasks</Text>
-              <Text size="xl" className="text-typography-400">›</Text>
-            </HStack>
-          </Pressable>
-        </Box>
-
-        <Box className="mt-4">
-          <Button
-            size="lg"
-            variant="outline"
-            action="negative"
-            className="w-full mb-4"
-            onPress={handleResetAccount}
-            isDisabled={isResetting || initializingTasks}
-          >
-            {isResetting || initializingTasks ? (
-              <Spinner size="sm" color="#dc2626" />
-            ) : (
-              <ButtonText>Reset Account</ButtonText>
-            )}
-          </Button>
-
-          <Button
-            size="lg"
-            variant="outline"
-            action="secondary"
-            className="w-full mb-4"
-            onPress={handleSignOut}
-          >
-            <ButtonText>Sign Out</ButtonText>
-          </Button>
-
-          <Button
-            size="xl"
-            variant="solid"
-            action="primary"
-            className="w-full"
-            onPress={() => navigation.navigate('Home')}
-          >
-            <ButtonText>Back to Home</ButtonText>
-          </Button>
-        </Box>
-      </Box>
-    </ScrollView>
+      </ScrollView>
+      <FloatingBottomBar activeRoute="Settings" />
+    </View>
   );
 }
