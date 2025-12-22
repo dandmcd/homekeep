@@ -4,6 +4,7 @@ module.exports = {
   content: [
     './app/**/*.{html,js,jsx,ts,tsx,mdx}',
     './components/**/*.{html,js,jsx,ts,tsx,mdx}',
+    './screens/**/*.{html,js,jsx,ts,tsx,mdx}',
     './utils/**/*.{html,js,jsx,ts,tsx,mdx}',
     './*.{html,js,jsx,ts,tsx,mdx}',
     './src/**/*.{html,js,jsx,ts,tsx,mdx}',
@@ -19,6 +20,13 @@ module.exports = {
   theme: {
     extend: {
       colors: {
+        "primary": "#5bec13",
+        "background-light": "#f6f8f6",
+        "background-dark": "#162210",
+        "surface-light": "#ffffff",
+        "surface-dark": "#1f2b18",
+        "text-main": "#131811",
+        "text-muted": "#6f8961",
         primary: {
           0: 'rgb(var(--color-primary-0)/<alpha-value>)',
           50: 'rgb(var(--color-primary-50)/<alpha-value>)',

@@ -1,17 +1,30 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { Alert, Platform } from 'react-native';
+import React, { useEffect, useState, useLayoutEffect } from 'react';
+import { Alert, Platform, ImageBackground, View } from 'react-native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Box } from '@/components/ui/box';
 import { Text } from '@/components/ui/text';
-import { Spinner } from '@/components/ui/spinner';
-import { Center } from '@/components/ui/center';
-import { Heading } from '@/components/ui/heading';
 import { ScrollView } from '@/components/ui/scroll-view';
-import { VStack } from '@/components/ui/vstack';
-import { HStack } from '@/components/ui/hstack';
+import { Spinner } from '@/components/ui/spinner';
 import { Pressable } from '@/components/ui/pressable';
+import { Center } from '@/components/ui/center';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
-import { frequencyLabels, Frequency } from '@/lib/database.types';
+import { Frequency } from '@/lib/database.types';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+
+type RootStackParamList = {
+    Home: undefined;
+    About: undefined;
+    Settings: undefined;
+    CoreTasks: undefined;
+    Calendar: undefined;
+};
+
+type CalendarScreenNavigationProp = NativeStackNavigationProp<RootStackParamList, 'Calendar'>;
+
+interface CalendarScreenProps {
+    navigation: CalendarScreenNavigationProp;
+}
 
 interface TaskEventItem {
     id: string;
@@ -26,38 +39,48 @@ interface GroupedTasks {
     [date: string]: TaskEventItem[];
 }
 
-export default function CalendarScreen() {
+export default function CalendarScreen({ navigation }: CalendarScreenProps) {
     const { user } = useAuth();
     const [tasks, setTasks] = useState<TaskEventItem[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // Hide default header
+    useLayoutEffect(() => {
+        navigation.setOptions({
+            headerShown: false,
+        });
+    }, [navigation]);
 
     useEffect(() => {
         fetchEvents();
     }, [user]);
 
     const fetchEvents = async () => {
-        if (!user) return;
+        if (!user) {
+            setLoading(false);
+            return;
+        }
 
         try {
             setLoading(true);
             const { data, error } = await supabase
                 .from('task_events')
                 .select(`
-          id,
-          due_date,
-          status,
-          user_task:user_tasks (
-            name,
-            frequency,
-            core_task:core_tasks (
-              name,
-              frequency
-            )
-          )
-        `)
+                  id,
+                  due_date,
+                  status,
+                  user_task:user_tasks (
+                    name,
+                    frequency,
+                    core_task:core_tasks (
+                      name,
+                      frequency
+                    )
+                  )
+                `)
                 .gte('due_date', new Date().toISOString().split('T')[0]) // Only future/today
                 .order('due_date', { ascending: true })
-                .limit(100); // Limit to next 100 events
+                .limit(100);
 
             if (error) throw error;
 
@@ -72,11 +95,6 @@ export default function CalendarScreen() {
             setTasks(mappedTasks);
         } catch (err) {
             console.error('Error fetching events:', err);
-            if (Platform.OS === 'web') {
-                window.alert('Failed to load schedule');
-            } else {
-                Alert.alert('Error', 'Failed to load schedule');
-            }
         } finally {
             setLoading(false);
         }
@@ -96,133 +114,284 @@ export default function CalendarScreen() {
 
             if (error) throw error;
 
-            // Update local state
             setTasks(prev => prev.map(t =>
                 t.id === item.id ? { ...t, status: newStatus as TaskEventItem['status'] } : t
             ));
 
         } catch (err) {
             console.error('Error updating task:', err);
+            const errorMessage = err instanceof Error ? err.message : 'Failed to update task';
             if (Platform.OS === 'web') {
-                window.alert('Failed to update task');
+                window.alert(errorMessage);
             } else {
-                Alert.alert('Error', 'Failed to update task');
+                Alert.alert('Error', errorMessage);
             }
         }
     };
 
-    // Group tasks by date
-    const groupedTasks: GroupedTasks = tasks.reduce((acc, task) => {
-        if (!acc[task.due_date]) {
-            acc[task.due_date] = [];
-        }
-        acc[task.due_date].push(task);
-        return acc;
-    }, {} as GroupedTasks);
-
-    const sortedDates = Object.keys(groupedTasks).sort();
-
-    const formatDate = (dateString: string) => {
-        const date = new Date(dateString + 'T00:00:00');
+    // Helper to generate dates for strip
+    const generateDateStrip = () => {
+        const dates = [];
         const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        const tomorrow = new Date(today);
-        tomorrow.setDate(tomorrow.getDate() + 1);
-
-        if (date.getTime() === today.getTime()) {
-            return 'Today';
-        } else if (date.getTime() === tomorrow.getTime()) {
-            return 'Tomorrow';
-        } else {
-            return date.toLocaleDateString('en-US', {
-                weekday: 'long',
-                month: 'short',
-                day: 'numeric'
-            });
+        for (let i = 0; i < 7; i++) {
+            const date = new Date(today);
+            date.setDate(today.getDate() + i);
+            dates.push(date);
         }
+        return dates;
     };
+
+    const dateStrip = generateDateStrip();
 
     if (loading) {
         return (
-            <Center className="flex-1 bg-background-50">
-                <Spinner size="lg" />
-                <Text size="md" className="text-typography-500 mt-4">Loading schedule...</Text>
+            <Center className="flex-1 bg-background-light dark:bg-background-dark">
+                <Spinner size="lg" color="#5bec13" />
+                <Text size="md" className="text-gray-500 mt-4">Loading schedule...</Text>
             </Center>
         );
     }
 
-    if (tasks.length === 0) {
-        return (
-            <Center className="flex-1 bg-background-50 p-5">
-                <Text size="lg" className="text-typography-500 text-center">No upcoming tasks scheduled</Text>
-                <Text size="sm" className="text-typography-400 mt-2 text-center">
-                    Tasks will appear here once they are generated.
-                </Text>
-            </Center>
-        );
-    }
+    // Split tasks for the timeline demo (Morning, Afternoon, Evening)
+    // using simple logic: standard tasks -> Morning, others -> Afternoon/Evening just for layout demo
+    // Ideally we would have time-of-day in the DB.
+    const morningTasks = tasks.slice(0, 2);
+    const afternoonTasks = tasks.slice(2, 3);
+    const eveningTasks = tasks.slice(3, 5);
 
     return (
-        <ScrollView className="flex-1 bg-background-50">
-            <Box className="p-4 pb-10">
-                <Heading size="lg" className="text-typography-900 mb-4">Upcoming Tasks</Heading>
+        <View className="flex-1 bg-background-light dark:bg-background-dark relative">
+            {/* Sticky Header */}
+            <View className="sticky top-0 z-40 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md pt-12 px-4 pb-2">
+                <View className="flex-row items-center justify-between mb-4">
+                    <View className="flex-row items-center space-x-3">
+                        <View className="rounded-full overflow-hidden border-2 border-primary w-10 h-10 bg-gray-200 justify-center items-center">
+                            {/* Placeholder Avatar */}
+                            <Text className="text-xs font-bold text-gray-500">U</Text>
+                        </View>
+                        <View>
+                            <Text className="text-xs font-semibold text-text-muted dark:text-gray-400 uppercase tracking-wider">Good Morning</Text>
+                            <Text className="text-lg font-bold leading-tight">Alex! ☀️</Text>
+                        </View>
+                    </View>
+                    <View className="flex-row gap-2">
+                        <Pressable className="w-10 h-10 rounded-full bg-surface-light dark:bg-surface-dark items-center justify-center shadow-sm">
+                            <MaterialIcons name="search" size={24} color="#131811" />
+                        </Pressable>
+                        <Pressable className="w-10 h-10 rounded-full bg-surface-light dark:bg-surface-dark items-center justify-center shadow-sm relative">
+                            <MaterialIcons name="notifications-none" size={24} color="#131811" />
+                            <View className="absolute top-2 right-2 w-2 h-2 bg-red-500 rounded-full" />
+                        </Pressable>
+                    </View>
+                </View>
 
-                <VStack space="lg">
-                    {sortedDates.map(date => (
-                        <Box key={date}>
-                            <Text size="sm" className="text-typography-500 font-bold mb-2 uppercase tracking-wide">
-                                {formatDate(date)}
-                            </Text>
+                {/* Date Strip */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} className="pb-2">
+                    <View className="flex-row gap-3">
+                        {dateStrip.map((date, index) => {
+                            const isSelected = index === 0; // Select today
+                            const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                            const dayNum = date.getDate();
 
-                            <VStack space="sm">
-                                {groupedTasks[date].map(task => {
-                                    const isCompleted = task.status === 'completed';
+                            return (
+                                <Pressable
+                                    key={index}
+                                    className={`flex-col h-16 w-14 shrink-0 items-center justify-center gap-1 rounded-full border ${isSelected
+                                        ? 'bg-primary border-primary shadow-sm'
+                                        : 'bg-surface-light dark:bg-surface-dark border-transparent dark:border-white/5'
+                                        }`}
+                                >
+                                    <Text className={`text-xs font-bold uppercase ${isSelected ? 'text-[#131811]' : 'text-text-muted dark:text-gray-400'}`}>
+                                        {dayName}
+                                    </Text>
+                                    <View className={`w-7 h-7 flex items-center justify-center rounded-full ${isSelected ? 'bg-black/10' : 'bg-transparent'}`}>
+                                        <Text className={`text-lg font-bold leading-none ${isSelected ? 'text-[#131811]' : 'text-text-main dark:text-white'}`}>
+                                            {dayNum}
+                                        </Text>
+                                    </View>
+                                </Pressable>
+                            );
+                        })}
+                    </View>
+                </ScrollView>
+            </View>
 
-                                    return (
+            <ScrollView className="flex-1 px-4 pt-2 mb-24" showsVerticalScrollIndicator={false}>
+                {/* Progress Widget */}
+                <View className="flex-col gap-3 p-5 rounded-xl bg-surface-light dark:bg-surface-dark shadow-sm mb-6">
+                    <View className="flex-row gap-6 justify-between items-center">
+                        <Text className="text-text-main dark:text-white text-base font-bold">You're crushing it! 🔥</Text>
+                        <Text className="text-text-muted dark:text-primary text-sm font-semibold">4/6 done</Text>
+                    </View>
+                    <View className="h-3 w-full rounded-full bg-[#f2f4f0] dark:bg-white/10 overflow-hidden">
+                        <View className="h-full rounded-full bg-primary" style={{ width: '66%' }} />
+                    </View>
+                </View>
+
+                {/* Hero Card: Today's Focus */}
+                <View className="mb-6">
+                    <View className="flex-row items-center justify-between mb-3">
+                        <Text className="text-text-main dark:text-white tracking-tight text-xl font-bold">Today's Focus</Text>
+                        <Pressable>
+                            <Text className="text-sm font-medium text-text-muted dark:text-primary">View All</Text>
+                        </Pressable>
+                    </View>
+                    <View className="relative overflow-hidden rounded-2xl bg-surface-light dark:bg-surface-dark shadow-sm">
+                        {/* Image Placeholder */}
+                        <View className="w-full bg-gray-300 h-32 relative bg-emerald-700">
+                            <View className="absolute inset-0 bg-black/30" />
+                            <View className="absolute bottom-3 left-4 right-4 flex-row justify-between items-end">
+                                <View className="bg-white/20 px-3 py-1 rounded-full border border-white/30">
+                                    <Text className="text-white text-xs font-bold tracking-wide">HIGH PRIORITY</Text>
+                                </View>
+                            </View>
+                        </View>
+                        {/* Content Area */}
+                        <View className="p-5 flex-col gap-4">
+                            <View className="flex-row justify-between items-start">
+                                <View>
+                                    <Text className="text-text-main dark:text-white text-xl font-bold leading-tight mb-1">Water the plants</Text>
+                                    <View className="flex-row items-center gap-2 text-text-muted dark:text-gray-400">
+                                        <MaterialIcons name="location-on" size={18} color="#6f8961" />
+                                        <Text className="text-sm font-medium text-text-muted">Living Room</Text>
+                                        <Text className="text-xs text-text-muted">•</Text>
+                                        <Text className="text-sm font-medium text-text-muted">15 mins</Text>
+                                    </View>
+                                </View>
+                                <Pressable className="w-12 h-12 rounded-full bg-primary items-center justify-center shadow-lg active:scale-95">
+                                    <MaterialIcons name="check" size={24} color="#131811" />
+                                </Pressable>
+                            </View>
+                        </View>
+                    </View>
+                </View>
+
+                {/* Timeline Feed */}
+                <View className="flex-col gap-0 relative">
+                    {/* Vertical Line Guide */}
+                    <View className="absolute left-[19px] top-4 bottom-0 w-[2px] bg-gray-200 dark:bg-white/10 rounded-full z-0" />
+
+                    {/* Group: Morning */}
+                    <View className="relative z-10 pb-6">
+                        <View className="flex-row items-center gap-4 mb-4">
+                            <View className="w-10 h-10 rounded-full bg-[#e3f6fc] dark:bg-[#1a3b47] items-center justify-center border-[3px] border-background-light dark:border-background-dark">
+                                <MaterialIcons name="wb-sunny" size={20} color="#0ea5e9" />
+                            </View>
+                            <Text className="text-sm font-bold text-text-muted dark:text-gray-400 tracking-wider uppercase">Morning Routine</Text>
+                        </View>
+
+                        <View className="ml-12 flex-col space-y-3">
+                            {morningTasks.map(task => (
+                                <View key={task.id} className="group flex-row items-center justify-between p-3 pr-4 rounded-[1.25rem] bg-surface-light dark:bg-surface-dark border border-gray-100 dark:border-gray-800 shadow-sm">
+                                    <View className="flex-row items-center gap-3">
                                         <Pressable
-                                            key={task.id}
                                             onPress={() => handleToggleStatus(task)}
-                                            className={`bg-white p-4 rounded-lg border-l-4 ${isCompleted ? 'border-success-500' : 'border-primary-500'
-                                                }`}
+                                            className={`w-6 h-6 rounded-full border-2 ${task.status === 'completed' ? 'bg-primary border-primary' : 'border-gray-300 dark:border-gray-600'} items-center justify-center`}
                                         >
-                                            <HStack className="justify-between items-center">
-                                                <Box className="flex-1 mr-3">
-                                                    <Text
-                                                        size="md"
-                                                        className={`font-medium ${isCompleted
-                                                                ? 'text-typography-400 line-through'
-                                                                : 'text-typography-900'
-                                                            }`}
-                                                    >
-                                                        {task.name}
-                                                    </Text>
-                                                    {task.frequency && (
-                                                        <Text size="xs" className="text-typography-500 mt-1">
-                                                            {frequencyLabels[task.frequency as Frequency]}
-                                                        </Text>
-                                                    )}
-                                                </Box>
-
-                                                <Box className={`px-3 py-1 rounded-full ${isCompleted ? 'bg-success-100' : 'bg-primary-50'
-                                                    }`}>
-                                                    <Text
-                                                        size="xs"
-                                                        className={`font-medium ${isCompleted ? 'text-success-700' : 'text-primary-700'
-                                                            }`}
-                                                    >
-                                                        {isCompleted ? '✓ Done' : 'Tap to Complete'}
-                                                    </Text>
-                                                </Box>
-                                            </HStack>
+                                            {task.status === 'completed' && <MaterialIcons name="check" size={14} color="#131811" />}
                                         </Pressable>
-                                    );
-                                })}
-                            </VStack>
-                        </Box>
-                    ))}
-                </VStack>
-            </Box>
-        </ScrollView>
+                                        <View className="flex-col">
+                                            <Text className="text-text-main dark:text-white font-bold text-sm">{task.name}</Text>
+                                            <Text className="text-text-muted dark:text-gray-500 text-xs font-medium">8:00 AM • Kitchen</Text>
+                                        </View>
+                                    </View>
+                                    <View className="bg-gray-100 dark:bg-white/5 px-2 py-1 rounded-md">
+                                        <Text className="text-gray-500 text-[10px] font-bold">15m</Text>
+                                    </View>
+                                </View>
+                            ))}
+                            {morningTasks.length === 0 && <Text className="text-gray-400 italic text-sm">No morning tasks</Text>}
+                        </View>
+                    </View>
+
+                    {/* Group: Afternoon */}
+                    <View className="relative z-10 pb-6">
+                        <View className="flex-row items-center gap-4 mb-4">
+                            <View className="w-10 h-10 rounded-full bg-[#fdf4db] dark:bg-[#423414] items-center justify-center border-[3px] border-background-light dark:border-background-dark">
+                                <MaterialIcons name="wb-cloudy" size={20} color="#f59e0b" />
+                            </View>
+                            <Text className="text-sm font-bold text-text-muted dark:text-gray-400 tracking-wider uppercase">Afternoon Projects</Text>
+                        </View>
+                        <View className="ml-12 flex-col space-y-3">
+                            {/* Static Example Item if no database items */}
+                            {afternoonTasks.length === 0 && (
+                                <View className="group flex-row items-center justify-between p-3 pr-4 rounded-[1.25rem] bg-surface-light dark:bg-surface-dark border border-gray-100 dark:border-gray-800 shadow-sm">
+                                    <View className="flex-row items-center gap-3">
+                                        <Pressable className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 items-center justify-center" />
+                                        <View className="flex-col">
+                                            <Text className="text-text-main dark:text-white font-bold text-sm">HVAC Filter Change</Text>
+                                            <Text className="text-text-muted dark:text-gray-500 text-xs font-medium">2:00 PM • Monthly</Text>
+                                        </View>
+                                    </View>
+                                    <View className="bg-blue-50 dark:bg-blue-900/20 px-2 py-1 rounded-md">
+                                        <Text className="text-blue-600 dark:text-blue-400 text-[10px] font-bold">Maint</Text>
+                                    </View>
+                                </View>
+                            )}
+                        </View>
+                    </View>
+
+                    {/* Group: Evening */}
+                    <View className="relative z-10 pb-6">
+                        <View className="flex-row items-center gap-4 mb-4">
+                            <View className="w-10 h-10 rounded-full bg-[#e8e4f5] dark:bg-[#2e2642] items-center justify-center border-[3px] border-background-light dark:border-background-dark">
+                                <MaterialIcons name="bedtime" size={20} color="#8b5cf6" />
+                            </View>
+                            <Text className="text-sm font-bold text-text-muted dark:text-gray-400 tracking-wider uppercase">Evening Tidy</Text>
+                        </View>
+                        <View className="ml-12 flex-col space-y-3">
+                            {/* Static Example + Add Button */}
+                            <View className="group flex-row items-center justify-between p-3 pr-4 rounded-[1.25rem] bg-surface-light dark:bg-surface-dark border border-gray-100 dark:border-gray-800 shadow-sm">
+                                <View className="flex-row items-center gap-3">
+                                    <Pressable className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 items-center justify-center" />
+                                    <View className="flex-col">
+                                        <Text className="text-text-main dark:text-white font-bold text-sm">Wipe Counters</Text>
+                                        <Text className="text-text-muted dark:text-gray-500 text-xs font-medium">8:00 PM • Kitchen</Text>
+                                    </View>
+                                </View>
+                                <View className="bg-purple-50 dark:bg-purple-900/20 px-2 py-1 rounded-md">
+                                    <Text className="text-purple-600 dark:text-purple-400 text-[10px] font-bold">Daily</Text>
+                                </View>
+                            </View>
+
+                            <Pressable className="flex-row items-center justify-center p-3 rounded-[1.25rem] border-2 border-dashed border-gray-200 dark:border-white/10 active:bg-gray-50">
+                                <Text className="text-gray-400 text-sm font-bold">+ Add Evening Task</Text>
+                            </Pressable>
+                        </View>
+                    </View>
+
+                </View>
+            </ScrollView>
+
+            {/* Floating Action Button - Fixed Position */}
+            <Pressable className="absolute bottom-24 right-5 w-16 h-16 rounded-full bg-primary shadow-lg items-center justify-center z-50 active:scale-95 transition-transform" style={{ elevation: 5 }}>
+                <MaterialIcons name="add" size={32} color="#131811" />
+            </Pressable>
+
+            {/* Bottom Navigation */}
+            <View className="absolute bottom-0 z-40 w-full bg-surface-light dark:bg-surface-dark border-t border-gray-100 dark:border-white/5 pt-2 px-6 pb-6">
+                <View className="flex-row justify-between items-center">
+                    <Pressable className="items-center gap-1 w-16" onPress={() => navigation.navigate('Home')}>
+                        <MaterialIcons name="home" size={24} color="#9ca3af" />
+                        <Text className="text-[10px] font-bold text-gray-400">Home</Text>
+                    </Pressable>
+                    <Pressable className="items-center gap-1 w-16">
+                        <View className="bg-primary/20 dark:bg-primary/10 px-4 py-1 rounded-full">
+                            <MaterialIcons name="calendar-today" size={24} color="#131811" />
+                        </View>
+                        <Text className="text-[10px] font-bold text-text-main dark:text-primary">Schedule</Text>
+                    </Pressable>
+                    <Pressable className="items-center gap-1 w-16">
+                        <MaterialIcons name="inventory-2" size={24} color="#9ca3af" />
+                        <Text className="text-[10px] font-bold text-gray-400">Assets</Text>
+                    </Pressable>
+                    <Pressable className="items-center gap-1 w-16" onPress={() => navigation.navigate('Settings')}>
+                        <MaterialIcons name="settings" size={24} color="#9ca3af" />
+                        <Text className="text-[10px] font-bold text-gray-400">Settings</Text>
+                    </Pressable>
+                </View>
+            </View>
+        </View>
     );
 }
+
