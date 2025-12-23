@@ -1,13 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useLayoutEffect } from 'react';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Box } from '@/components/ui/box';
 import { Text } from '@/components/ui/text';
-import { Heading } from '@/components/ui/heading';
-import { Button, ButtonText } from '@/components/ui/button';
-import { ScrollView } from '@/components/ui/scroll-view';
+import { Box } from '@/components/ui/box';
 import { VStack } from '@/components/ui/vstack';
 import { Center } from '@/components/ui/center';
 import { Spinner } from '@/components/ui/spinner';
+import { ScrollView } from '@/components/ui/scroll-view';
+import { View, Pressable } from 'react-native';
+import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
 import {
   CoreTask,
@@ -36,6 +36,13 @@ export default function CoreTasksScreen({ navigation }: CoreTasksScreenProps) {
   const [tasks, setTasks] = useState<CoreTask[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Hide default header
+  useLayoutEffect(() => {
+    navigation.setOptions({
+      headerShown: false,
+    });
+  }, [navigation]);
 
   useEffect(() => {
     async function fetchCoreTasks() {
@@ -74,94 +81,115 @@ export default function CoreTasksScreen({ navigation }: CoreTasksScreenProps) {
     {} as Record<Frequency, CoreTask[]>
   );
 
+  // Helper to render the correct icon family
+  const getTaskIcon = (iconName?: string, size = 20, color = "#5bec13") => {
+    if (!iconName) return <MaterialIcons name="cleaning-services" size={size} color={color} />;
+
+    if (iconName.startsWith('mci:')) {
+      const name = iconName.replace('mci:', '') as any;
+      return <MaterialCommunityIcons name={name} size={size} color={color} />;
+    }
+
+    return <MaterialIcons name={iconName as any} size={size} color={color} />;
+  };
+
   if (loading) {
     return (
-      <Center className="flex-1 bg-background-50">
-        <Spinner size="lg" />
-        <Text size="md" className="text-typography-500 mt-4">
-          Loading core tasks...
-        </Text>
-      </Center>
-    );
-  }
-
-  if (error) {
-    return (
-      <Center className="flex-1 bg-background-50 p-5">
-        <Text size="lg" className="text-error-500 text-center mb-4">
-          {error}
-        </Text>
-        <Button
-          size="md"
-          variant="solid"
-          action="primary"
-          onPress={() => navigation.goBack()}
-        >
-          <ButtonText>Go Back</ButtonText>
-        </Button>
-      </Center>
+      <View className="flex-1 bg-background-light dark:bg-background-dark relative">
+        <Center className="flex-1">
+          <Spinner size="lg" color="#5bec13" />
+          <Text size="md" className="text-gray-500 mt-4">Loading core tasks...</Text>
+        </Center>
+      </View>
     );
   }
 
   return (
-    <ScrollView className="flex-1 bg-background-50">
-      <Box className="p-5 pb-10">
-        <Heading size="xl" className="text-typography-900 mb-2 text-center">
-          Core Maintenance Tasks
-        </Heading>
-        <Text size="sm" className="text-typography-500 mb-5 text-center">
-          These are the default tasks that will be added for new users. Tasks
-          cannot be modified.
-        </Text>
-
-        {frequencyOrder.map((frequency) => {
-          const frequencyTasks = tasksByFrequency[frequency];
-          if (!frequencyTasks || frequencyTasks.length === 0) {
-            return null;
-          }
-
-          return (
-            <Box key={frequency} className="bg-white p-4 rounded-lg mb-4">
-              <Heading size="md" className="text-typography-900 mb-3">
-                {frequencyLabels[frequency]}
-              </Heading>
-              <VStack space="sm">
-                {frequencyTasks.map((task) => (
-                  <Box
-                    key={task.id}
-                    className="py-3 px-3 bg-background-50 rounded-md"
-                  >
-                    <Text size="md" className="text-typography-800">
-                      {task.name}
-                    </Text>
-                  </Box>
-                ))}
-              </VStack>
-            </Box>
-          );
-        })}
-
-        {tasks.length === 0 && (
-          <Center className="py-10">
-            <Text size="lg" className="text-typography-400">
-              No core tasks found
-            </Text>
-            <Text size="sm" className="text-typography-400 mt-2 text-center">
-              Run the seed SQL in your Supabase dashboard to add core tasks.
-            </Text>
-          </Center>
-        )}
-
-        <Button
-          size="xl"
-          variant="solid"
-          action="primary"
-          className="mt-5"
-          onPress={() => navigation.goBack()}
-        >
-          <ButtonText>Back to Settings</ButtonText>
-        </Button>
+    <View className="flex-1 bg-background-light dark:bg-background-dark relative">
+      {/* Sticky Header */}
+      <Box className="sticky top-0 z-20 bg-background-light/90 dark:bg-background-dark/90 px-4 pt-12 pb-4 backdrop-blur-md border-b border-gray-100/50 dark:border-white/5">
+        <View className="flex-row items-center">
+          <Pressable
+            onPress={() => navigation.goBack()}
+            className="w-10 h-10 rounded-full bg-surface-light dark:bg-surface-dark items-center justify-center shadow-sm mr-4 active:bg-gray-100 dark:active:bg-gray-800"
+          >
+            <MaterialIcons name="arrow-back" size={24} color="#131811" />
+          </Pressable>
+          <View>
+            <Text className="text-xl font-bold text-gray-900 dark:text-white">Core Maintenance</Text>
+            <Text className="text-xs text-gray-500">System Defaults</Text>
+          </View>
+        </View>
       </Box>
-    </ScrollView>
+
+      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+        <Box className="p-4 pb-10">
+
+          <View className="bg-blue-50 dark:bg-blue-900/20 p-4 rounded-xl mb-6 border border-blue-100 dark:border-blue-900/50 flex-row items-start space-x-3">
+            <MaterialIcons name="info-outline" size={24} color="#2563eb" />
+            <Text className="flex-1 text-sm text-blue-800 dark:text-blue-300 leading-5">
+              These are the default tasks that are added for all new users. They serve as the foundation for a healthy home maintenance schedule.
+            </Text>
+          </View>
+
+          {error && (
+            <View className="bg-red-50 dark:bg-red-900/20 p-4 rounded-xl mb-6 border border-red-100 dark:border-red-900/50">
+              <Text className="text-red-700 dark:text-red-400">{error}</Text>
+            </View>
+          )}
+
+          {frequencyOrder.map((frequency) => {
+            const frequencyTasks = tasksByFrequency[frequency];
+            if (!frequencyTasks || frequencyTasks.length === 0) {
+              return null;
+            }
+
+            return (
+              <Box key={frequency} className="mb-6">
+                <Text className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 ml-2">
+                  {frequencyLabels[frequency]}
+                </Text>
+
+                <VStack className="space-y-3">
+                  {frequencyTasks.map((task) => (
+                    <View
+                      key={task.id}
+                      className="flex-row items-center p-3 bg-surface-light dark:bg-surface-dark rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm"
+                    >
+                      <View className="w-10 h-10 rounded-full bg-gray-50 dark:bg-gray-800 items-center justify-center mr-3">
+                        {getTaskIcon(task.icon, 20, "#555")}
+                      </View>
+
+                      <View className="flex-1">
+                        <Text className="text-base font-bold text-gray-900 dark:text-white">
+                          {task.name}
+                        </Text>
+                        <Text className="text-xs text-gray-400">
+                          Default Task
+                        </Text>
+                      </View>
+
+                      <View className="w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-800 items-center justify-center">
+                        <MaterialIcons name="lock-outline" size={16} color="#9ca3af" />
+                      </View>
+                    </View>
+                  ))}
+                </VStack>
+              </Box>
+            );
+          })}
+
+          {tasks.length === 0 && !loading && !error && (
+            <Center className="py-20">
+              <MaterialIcons name="playlist-remove" size={48} color="#d1d5db" />
+              <Text className="text-lg text-gray-400 font-medium mt-3">
+                No core tasks found
+              </Text>
+            </Center>
+          )}
+
+        </Box>
+      </ScrollView>
+    </View>
   );
 }

@@ -41,7 +41,7 @@ interface GroupedTasks {
 }
 
 export default function CalendarScreen({ navigation }: CalendarScreenProps) {
-    const { user } = useAuth();
+    const { user, userProfile } = useAuth();
     const [tasks, setTasks] = useState<TaskEventItem[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -163,6 +163,16 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
     const afternoonTasks = tasks.slice(2, 3);
     const eveningTasks = tasks.slice(3, 5);
 
+    const getTimeBasedGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return 'Good Morning';
+        if (hour < 18) return 'Good Afternoon';
+        return 'Good Evening';
+    };
+
+    const greeting = getTimeBasedGreeting();
+    const displayName = userProfile?.first_name ? userProfile.first_name : (user?.email?.split('@')[0] || 'User');
+
     return (
         <View className="flex-1 bg-background-light dark:bg-background-dark relative">
             {/* Sticky Header */}
@@ -174,8 +184,8 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
                             <Text className="text-xs font-bold text-gray-500">U</Text>
                         </View>
                         <View>
-                            <Text className="text-xs font-semibold text-text-muted dark:text-gray-400 uppercase tracking-wider">Good Morning</Text>
-                            <Text className="text-lg font-bold leading-tight">Alex! ☀️</Text>
+                            <Text className="text-xs font-semibold text-text-muted dark:text-gray-400 uppercase tracking-wider">{greeting}</Text>
+                            <Text className="text-lg font-bold leading-tight">{displayName}! ☀️</Text>
                         </View>
                     </View>
                     <View className="flex-row gap-2">
@@ -287,14 +297,14 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
                         <View className="ml-12 flex-col space-y-3">
                             {morningTasks.map(task => (
                                 <View key={task.id} className="group flex-row items-center justify-between p-3 pr-4 rounded-[1.25rem] bg-surface-light dark:bg-surface-dark border border-gray-100 dark:border-gray-800 shadow-sm">
-                                    <View className="flex-row items-center gap-3">
+                                    <View className="flex-row items-center gap-3 flex-1">
                                         <Pressable
                                             onPress={() => handleToggleStatus(task)}
                                             className={`w-6 h-6 rounded-full border-2 ${task.status === 'completed' ? 'bg-primary border-primary' : 'border-gray-300 dark:border-gray-600'} items-center justify-center`}
                                         >
                                             {task.status === 'completed' && <MaterialIcons name="check" size={14} color="#131811" />}
                                         </Pressable>
-                                        <View className="flex-col">
+                                        <View className="flex-col flex-1 mr-2">
                                             <Text className="text-text-main dark:text-white font-bold text-sm">{task.name}</Text>
                                             <Text className="text-text-muted dark:text-gray-500 text-xs font-medium">8:00 AM • Kitchen</Text>
                                         </View>
@@ -320,9 +330,9 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
                             {/* Static Example Item if no database items */}
                             {afternoonTasks.length === 0 && (
                                 <View className="group flex-row items-center justify-between p-3 pr-4 rounded-[1.25rem] bg-surface-light dark:bg-surface-dark border border-gray-100 dark:border-gray-800 shadow-sm">
-                                    <View className="flex-row items-center gap-3">
+                                    <View className="flex-row items-center gap-3 flex-1">
                                         <Pressable className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 items-center justify-center" />
-                                        <View className="flex-col">
+                                        <View className="flex-col flex-1 mr-2">
                                             <Text className="text-text-main dark:text-white font-bold text-sm">HVAC Filter Change</Text>
                                             <Text className="text-text-muted dark:text-gray-500 text-xs font-medium">2:00 PM • Monthly</Text>
                                         </View>
@@ -346,9 +356,9 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
                         <View className="ml-12 flex-col space-y-3">
                             {/* Static Example + Add Button */}
                             <View className="group flex-row items-center justify-between p-3 pr-4 rounded-[1.25rem] bg-surface-light dark:bg-surface-dark border border-gray-100 dark:border-gray-800 shadow-sm">
-                                <View className="flex-row items-center gap-3">
+                                <View className="flex-row items-center gap-3 flex-1">
                                     <Pressable className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 items-center justify-center" />
-                                    <View className="flex-col">
+                                    <View className="flex-col flex-1 mr-2">
                                         <Text className="text-text-main dark:text-white font-bold text-sm">Wipe Counters</Text>
                                         <Text className="text-text-muted dark:text-gray-500 text-xs font-medium">8:00 PM • Kitchen</Text>
                                     </View>

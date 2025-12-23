@@ -42,7 +42,7 @@ interface HomeScreenProps {
 }
 
 export default function HomeScreen({ navigation }: HomeScreenProps) {
-  const { user, isInitialized, initializingTasks } = useAuth();
+  const { user, userProfile, isInitialized, initializingTasks } = useAuth();
   const [tasks, setTasks] = useState<UserTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -132,6 +132,16 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     return <MaterialIcons name={iconName as any} size={size} color={color} />;
   };
 
+  const getTimeBasedGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 18) return 'Good Afternoon';
+    return 'Good Evening';
+  };
+
+  const greeting = getTimeBasedGreeting();
+  const displayName = userProfile?.first_name ? userProfile.first_name : null;
+
   if (initializingTasks || loading) {
     return (
       <View className="flex-1 bg-background-light dark:bg-background-dark relative">
@@ -183,7 +193,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         {/* Greeting & Status */}
         <Box className="px-4 pt-2 pb-6">
           <Text className="text-3xl font-bold leading-tight mb-1 text-gray-900 dark:text-white">
-            Good Morning,{'\n'}Alex! ☀️
+            {greeting}{displayName ? `,${'\n'}${displayName}! ☀️` : '! ☀️'}
           </Text>
           <Text className="text-gray-500 dark:text-gray-400 text-sm font-medium">
             Let's keep the house sparkling today.

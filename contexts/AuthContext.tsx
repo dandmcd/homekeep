@@ -8,7 +8,7 @@ import React, {
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import { generateTaskEventsForUser } from "../lib/scheduling";
-import { UserTask, CoreTask, Frequency } from "../lib/database.types";
+import { UserTask, CoreTask, Frequency, UserProfile } from "../lib/database.types";
 import * as WebBrowser from "expo-web-browser";
 import * as AuthSession from "expo-auth-session";
 import { makeRedirectUri } from "expo-auth-session";
@@ -22,6 +22,8 @@ interface AuthContextType {
     loading: boolean;
     isInitialized: boolean;
     initializingTasks: boolean;
+    userProfile: UserProfile | null;
+    updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
     signInWithGoogle: () => Promise<void>;
     signOut: () => Promise<void>;
     resetAccount: () => Promise<void>;
@@ -32,6 +34,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [session, setSession] = useState<Session | null>(null);
     const [user, setUser] = useState<User | null>(null);
+    const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [isInitialized, setIsInitialized] = useState(false);
     const [initializingTasks, setInitializingTasks] = useState(false);
@@ -43,24 +46,41 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
 
     // Initialize user tasks by copying all core tasks to user_tasks
-    const initializeUserTasks = useCallback(async (userId: string): Promise<void> => {
+    const initializeUserTasks = useCallback(async (user: User): Promise<void> => {
+        const userId = user.id;
+
+        // Try to extract name from metadata
+        const metadata = user.user_metadata || {};
+        const fullName = metadata.full_name || metadata.name || '';
+        const nameParts = fullName.split(' ');
+        const firstName = nameParts[0] || '';
+        const lastName = nameParts.slice(1).join(' ') || '';
+
         // First, create or update user profile (as not initialized yet)
-        const { error: profileError } = await supabase
+        const { data: profile, error: profileError } = await supabase
             .from('user_profiles')
             .upsert(
                 {
                     user_id: userId,
                     initialized: false,
+                    first_name: firstName,
+                    last_name: lastName,
                     updated_at: new Date().toISOString(),
                 },
                 {
                     onConflict: 'user_id',
                 }
-            );
+            )
+            .select()
+            .single();
 
         if (profileError) {
             console.error('Error creating user profile:', profileError);
             throw profileError;
+        }
+
+        if (profile) {
+            setUserProfile(profile);
         }
 
         // Get all core tasks with frequency
@@ -166,7 +186,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setIsInitialized(false);
 
             // Re-initialize with fresh core tasks
-            await initializeUserTasks(user.id);
+            await initializeUserTasks(user);
         } catch (err) {
             console.error('Error in resetAccount:', err);
             throw err;
@@ -176,11 +196,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [user, initializeUserTasks]);
 
     // Handle user initialization check and auto-initialize
-    const handleUserInit = useCallback(async (userId: string): Promise<void> => {
+    const handleUserInit = useCallback(async (currentUser: User): Promise<void> => {
+        const userId = currentUser.id;
         console.log('handleUserInit started for:', userId);
         const { data, error } = await supabase
             .from('user_profiles')
-            .select('initialized')
+            .select('*')
             .eq('user_id', userId)
             .single();
 
@@ -192,9 +213,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const initialized = data?.initialized ?? false;
         setIsInitialized(initialized);
 
+        if (data) {
+            setUserProfile(data);
+        }
+
         if (!initialized) {
             console.log('User not initialized, starting initializeUserTasks...');
-            await initializeUserTasks(userId);
+            await initializeUserTasks(currentUser);
             console.log('initializeUserTasks completed');
         } else {
             console.log('User already initialized in database, skipping task creation');
@@ -240,7 +265,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const init = async () => {
             setInitializingTasks(true);
             try {
-                await handleUserInit(user.id);
+                await handleUserInit(user);
             } catch (err) {
                 if (!cancelled) {
                     console.error('Failed to initialize user:', err);
@@ -322,9 +347,33 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     }, []);
 
+    const updateProfile = useCallback(async (updates: Partial<UserProfile>) => {
+        if (!user) return;
+
+        try {
+            const { data, error } = await supabase
+                .from('user_profiles')
+                .update({ ...updates, updated_at: new Date().toISOString() })
+                .eq('user_id', user.id)
+                .select()
+                .single();
+
+            if (error) throw error;
+
+            if (data) {
+                setUserProfile(data);
+            }
+        } catch (error) {
+            console.error("Error updating profile:", error);
+            throw error;
+        }
+    }, [user]);
+
     const value = {
         session,
         user,
+        userProfile,
+        updateProfile,
         loading,
         isInitialized,
         initializingTasks,
