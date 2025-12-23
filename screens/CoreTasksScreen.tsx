@@ -165,7 +165,7 @@ export default function CoreTasksScreen({ navigation }: CoreTasksScreenProps) {
                           {task.name}
                         </Text>
                         <Text className="text-xs text-gray-400">
-                          Default Task
+                          {frequencyLabels[task.frequency]}
                         </Text>
                       </View>
 
