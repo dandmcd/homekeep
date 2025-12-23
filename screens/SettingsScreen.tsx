@@ -10,6 +10,7 @@ import { Spinner } from '@/components/ui/spinner';
 import { ScrollView } from '@/components/ui/scroll-view';
 import { useAuth } from '@/contexts/AuthContext';
 import { FloatingBottomBar } from '@/components/FloatingBottomBar';
+import { UserAvatar } from '@/components/UserAvatar';
 import { MaterialIcons } from '@expo/vector-icons';
 
 type RootStackParamList = {
@@ -157,11 +158,7 @@ export default function SettingsScreen({ navigation }: SettingsScreenProps) {
           {/* User Profile Section */}
           <Card>
             <HStack className="items-center space-x-4 mb-6">
-              <View className="w-14 h-14 rounded-full bg-gray-200 dark:bg-gray-700 items-center justify-center border-2 border-primary">
-                <Text className="text-xl font-bold text-gray-500 dark:text-gray-300">
-                  {(firstName || user?.email || 'U').charAt(0).toUpperCase()}
-                </Text>
-              </View>
+              <UserAvatar className="w-14 h-14" textClassName="text-xl" />
               <View className="flex-1">
                 <Text className="text-lg font-bold text-gray-900 dark:text-white">
                   {firstName && lastName ? `${firstName} ${lastName}` : firstName || user?.email || 'User'}

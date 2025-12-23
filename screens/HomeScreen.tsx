@@ -15,6 +15,7 @@ import { supabase } from '@/lib/supabase';
 import { UserTask, frequencyLabels, Frequency } from '@/lib/database.types';
 import { View } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { UserAvatar } from '@/components/UserAvatar';
 import { FloatingBottomBar } from '@/components/FloatingBottomBar';
 // Custom helper component for consistent card styling
 function Card({ children, className, style }: { children: React.ReactNode; className?: string; style?: any }) {
@@ -176,12 +177,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                 onPress={() => navigation.navigate('Settings')}
                 className="relative active:opacity-80"
               >
-                <View className="rounded-full overflow-hidden border-2 border-primary w-10 h-10 bg-gray-200 justify-center items-center">
-                  {/* Placeholder avatar if image fails or not available */}
-                  <Text className="text-xs font-bold text-gray-500">U</Text>
-                  {/* If you had a real image URL, use <Image source={{ uri: '...' }} className="w-full h-full" /> */}
-                </View>
-                <View className="absolute bottom-0 right-0 w-3 h-3 bg-primary border-2 border-white dark:border-background-dark rounded-full" />
+                <UserAvatar className="w-10 h-10" textClassName="text-xs" />
               </Pressable>
             </HStack>
             <Pressable className="w-10 h-10 rounded-full bg-surface-light dark:bg-surface-dark shadow-sm items-center justify-center active:bg-gray-100 dark:active:bg-gray-800">

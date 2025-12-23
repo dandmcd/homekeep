@@ -11,6 +11,7 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Frequency } from '@/lib/database.types';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { UserAvatar } from '@/components/UserAvatar';
 import { FloatingBottomBar } from '@/components/FloatingBottomBar';
 
 type RootStackParamList = {
@@ -179,10 +180,7 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
             <View className="sticky top-0 z-40 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md pt-12 px-4 pb-2">
                 <View className="flex-row items-center justify-between mb-4">
                     <View className="flex-row items-center space-x-3">
-                        <View className="rounded-full overflow-hidden border-2 border-primary w-10 h-10 bg-gray-200 justify-center items-center">
-                            {/* Placeholder Avatar */}
-                            <Text className="text-xs font-bold text-gray-500">U</Text>
-                        </View>
+                        <UserAvatar className="w-10 h-10" textClassName="text-xs" />
                         <View>
                             <Text className="text-xs font-semibold text-text-muted dark:text-gray-400 uppercase tracking-wider">{greeting}</Text>
                             <Text className="text-lg font-bold leading-tight">{displayName}! ☀️</Text>
