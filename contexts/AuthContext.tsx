@@ -25,6 +25,8 @@ interface AuthContextType {
     userProfile: UserProfile | null;
     updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
     signInWithGoogle: () => Promise<void>;
+    signInWithEmail: (email: string, password: string) => Promise<void>;
+    signUpWithEmail: (email: string, password: string) => Promise<void>;
     signOut: () => Promise<void>;
     resetAccount: () => Promise<void>;
 }
@@ -334,6 +336,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     }, [redirectUri]);
 
+    const signInWithEmail = useCallback(async (email: string, password: string) => {
+        try {
+            setLoading(true);
+            const { error } = await supabase.auth.signInWithPassword({
+                email,
+                password,
+            });
+            if (error) throw error;
+        } catch (error) {
+            console.error("Email sign-in error:", error);
+            throw error;
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
+    const signUpWithEmail = useCallback(async (email: string, password: string) => {
+        try {
+            setLoading(true);
+            const { error } = await supabase.auth.signUp({
+                email,
+                password,
+            });
+            if (error) throw error;
+        } catch (error) {
+            console.error("Email sign-up error:", error);
+            throw error;
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     const signOut = useCallback(async () => {
         try {
             setLoading(true);
@@ -378,6 +412,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         isInitialized,
         initializingTasks,
         signInWithGoogle,
+        signInWithEmail,
+        signUpWithEmail,
         signOut,
         resetAccount,
     };
