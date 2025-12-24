@@ -4,19 +4,18 @@ import 'dotenv/config';
 test('has title', async ({ page }) => {
     await page.goto('/');
 
-    // Expect a title "to contain" a substring.
-    // Note: Adjust this match based on your actual app title document.title
-    await expect(page).toHaveTitle(/HomeKeep|React Native Web/i);
+    // Expect the document title to match the app
+    // Expo sets this based on the current screen (e.g., 'Login' for login screen)
+    await expect(page).toHaveTitle(/HomeKeep|Login|React Native Web/i);
 });
 
 test('can log in with test user', async ({ page }) => {
     const email = process.env.TEST_USER_EMAIL || 'homekeep.test.user.v2@gmail.com';
     const password = process.env.TEST_USER_PASSWORD || 'password123';
 
-    // Enable debug logging
-    page.on('console', msg => console.log(`BROWSER LOG: ${msg.text()}`));
+    // Log browser console/errors for debugging (visible in test output)
+    page.on('console', msg => console.log(`BROWSER: ${msg.text()}`));
     page.on('pageerror', err => console.log(`BROWSER ERROR: ${err.message}`));
-    page.on('requestfailed', request => console.log(`FAILED REQUEST: ${request.url()} - ${request.failure()?.errorText}`));
 
     await page.goto('/');
 
@@ -30,14 +29,15 @@ test('can log in with test user', async ({ page }) => {
     // Check if we are already logged in?
     // For now, let's assume clean state or having to click 'Sign In'
 
-    // Check for the specific login screen text
+    // Wait for the page to fully load and check which screen we're on
+    // Use waitFor with a short timeout to give the page time to render
     const loginHeader = page.getByText('Sign in to manage your home');
-    if (await loginHeader.isVisible()) {
-        console.log('On landing/login page');
+    try {
+        await loginHeader.waitFor({ state: 'visible', timeout: 5000 });
 
         // Fill credentials
-        await page.getByPlaceholder(/Email/i).fill(email);
-        await page.getByPlaceholder(/Password/i).fill(password);
+        await page.getByPlaceholder(/enter email/i).fill(email);
+        await page.getByPlaceholder(/enter password/i).fill(password);
 
         // Click Sign In
         await page.getByRole('button', { name: 'Sign In', exact: true }).click();
@@ -45,9 +45,8 @@ test('can log in with test user', async ({ page }) => {
         // Verification: Expect to see Home Screen content
         // "Focus for Today" is a reliable static text on the home screen
         await expect(page.getByText('Focus for Today')).toBeVisible({ timeout: 15000 });
-    } else {
-        console.log('Might be already logged in or on a different screen');
+    } catch {
         // Just verify we are in the app
-        await expect(page.getByText('Focus for Today')).toBeVisible();
+        await expect(page.getByText('Focus for Today')).toBeVisible({ timeout: 15000 });
     }
 });
