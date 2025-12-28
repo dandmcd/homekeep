@@ -14,6 +14,7 @@ import { Pressable } from '@/components/ui/pressable';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { UserTask, frequencyLabels, Frequency, TaskEvent } from '@/lib/database.types';
+import { calculateNextDueDate, formatDate } from '@/lib/scheduling';
 import { View } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { UserAvatar } from '@/components/UserAvatar';
@@ -210,6 +211,24 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         });
 
       if (error) throw error;
+
+      // Schedule the next occurrence for recurring tasks
+      const frequency = task.frequency || task.core_task?.frequency;
+      if (frequency) {
+        const nextDueDate = calculateNextDueDate(frequency as Frequency);
+        const { error: nextError } = await supabase
+          .from('task_events')
+          .insert({
+            user_task_id: task.id,
+            status: 'pending',
+            due_date: formatDate(nextDueDate)
+          });
+
+        if (nextError) {
+          console.warn('Error scheduling next occurrence:', nextError);
+          // Don't throw - the completion was successful, just log the scheduling issue
+        }
+      }
 
     } catch (err) {
       console.error('Error marking done:', err);

@@ -10,6 +10,7 @@ import { Center } from '@/components/ui/center';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/contexts/AuthContext';
 import { Frequency } from '@/lib/database.types';
+import { calculateNextDueDate, formatDate } from '@/lib/scheduling';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { UserAvatar } from '@/components/UserAvatar';
 import { FloatingBottomBar } from '@/components/FloatingBottomBar';
@@ -30,6 +31,7 @@ interface CalendarScreenProps {
 
 interface TaskEventItem {
     id: string;
+    user_task_id: string;
     name: string;
     status: 'pending' | 'completed' | 'skipped';
     frequency?: Frequency;
@@ -71,7 +73,9 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
                   id,
                   due_date,
                   status,
+                  user_task_id,
                   user_task:user_tasks (
+                    id,
                     name,
                     frequency,
                     core_task:core_tasks (
@@ -88,6 +92,7 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
 
             const mappedTasks: TaskEventItem[] = data.map((event: any) => ({
                 id: event.id,
+                user_task_id: event.user_task_id,
                 name: event.user_task?.name || event.user_task?.core_task?.name || 'Unknown Task',
                 status: event.status,
                 frequency: event.user_task?.frequency || event.user_task?.core_task?.frequency,
@@ -115,6 +120,22 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
                 .eq('id', item.id);
 
             if (error) throw error;
+
+            // Schedule the next occurrence when completing a recurring task
+            if (newStatus === 'completed' && item.frequency) {
+                const nextDueDate = calculateNextDueDate(item.frequency);
+                const { error: nextError } = await supabase
+                    .from('task_events')
+                    .insert({
+                        user_task_id: item.user_task_id,
+                        status: 'pending',
+                        due_date: formatDate(nextDueDate)
+                    });
+
+                if (nextError) {
+                    console.warn('Error scheduling next occurrence:', nextError);
+                }
+            }
 
             setTasks(prev => prev.map(t =>
                 t.id === item.id ? { ...t, status: newStatus as TaskEventItem['status'] } : t
