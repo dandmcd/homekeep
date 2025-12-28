@@ -165,7 +165,9 @@ export default function CoreTasksScreen({ navigation }: CoreTasksScreenProps) {
                           {task.name}
                         </Text>
                         <Text className="text-xs text-gray-400">
+                          {task.room ? `${task.room} • ` : ''}
                           {frequencyLabels[task.frequency]}
+                          {task.estimated_time ? ` • ${task.estimated_time} min` : ''}
                         </Text>
                       </View>
 

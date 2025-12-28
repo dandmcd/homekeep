@@ -3,6 +3,7 @@
  */
 
 export type Frequency =
+  | 'daily'
   | 'weekly'
   | 'biweekly'
   | 'monthly'
@@ -21,12 +22,15 @@ export interface CoreTask {
   frequency: Frequency;
   created_at: string;
   icon?: string;
+  room?: string;
+  estimated_time?: number; // minutes
 }
 
 /**
  * Display labels for frequency values
  */
 export const frequencyLabels: Record<Frequency, string> = {
+  daily: 'Daily',
   weekly: 'Weekly',
   biweekly: 'Every Other Week',
   monthly: 'Monthly',
@@ -44,6 +48,7 @@ export const frequencyLabels: Record<Frequency, string> = {
  * Order for displaying frequencies in the UI
  */
 export const frequencyOrder: Frequency[] = [
+  'daily',
   'weekly',
   'biweekly',
   'monthly',
@@ -79,6 +84,8 @@ export interface UserTask {
   core_task_id: string | null;
   name?: string;
   frequency?: Frequency;
+  room?: string;
+  estimated_time?: number;
   created_at: string;
   // Joined data from core_tasks
   core_task?: CoreTask;
