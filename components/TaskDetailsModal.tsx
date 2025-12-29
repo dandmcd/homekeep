@@ -7,6 +7,7 @@ import { Pressable } from '@/components/ui/pressable';
 import { MaterialIcons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, { useAnimatedProps, useSharedValue, withTiming, Easing, useAnimatedStyle, withSpring, FadeIn, FadeOut } from 'react-native-reanimated';
+import { frequencyLabels, Frequency } from '@/lib/database.types';
 
 const { width } = Dimensions.get('window');
 
@@ -115,6 +116,11 @@ export function TaskDetailsModal({ isVisible, onClose, onComplete, taskName, dur
     // Helper to format frequency nicely
     const formatFrequency = (freq?: string) => {
         if (!freq) return 'One-time';
+        // Check if the frequency string exists in our defined labels
+        // We cast freq to Frequency if it matches, otherwise fallback to capitalizing the raw string (safeguard)
+        if (freq in frequencyLabels) {
+            return frequencyLabels[freq as Frequency];
+        }
         return freq.charAt(0).toUpperCase() + freq.slice(1);
     }
 
