@@ -73,6 +73,7 @@ export interface UserProfile {
   last_name?: string;
   created_at: string;
   updated_at: string;
+  role?: 'user' | 'admin';
 }
 
 /**

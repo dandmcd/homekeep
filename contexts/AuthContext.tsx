@@ -23,6 +23,7 @@ interface AuthContextType {
     isInitialized: boolean;
     initializingTasks: boolean;
     userProfile: UserProfile | null;
+    isAdmin: boolean;
     updateProfile: (updates: Partial<UserProfile>) => Promise<void>;
     signInWithGoogle: () => Promise<void>;
     signInWithEmail: (email: string, password: string) => Promise<void>;
@@ -407,6 +408,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         session,
         user,
         userProfile,
+        isAdmin: userProfile?.role === 'admin',
         updateProfile,
         loading,
         isInitialized,
