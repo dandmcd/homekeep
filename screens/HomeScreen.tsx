@@ -47,7 +47,7 @@ interface HomeScreenProps {
 }
 
 export default function HomeScreen({ navigation }: HomeScreenProps) {
-  const { user, userProfile, isInitialized, initializingTasks } = useAuth();
+  const { user, userProfile, isInitialized, initializingTasks, household, householdMembers } = useAuth();
   const [tasks, setTasks] = useState<UserTask[]>([]);
   const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
   const [pendingTaskMap, setPendingTaskMap] = useState<Map<string, string>>(new Map()); // taskId -> dueDate
@@ -76,11 +76,13 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         setLoading(true);
 
         // 1. Fetch User Tasks
-        const { data: tasksData, error: tasksError } = await supabase
+        let query = supabase
           .from('user_tasks')
           .select(`
             id,
             user_id,
+            household_id,
+            assigned_to,
             core_task_id,
             name,
             frequency,
@@ -97,7 +99,15 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
               estimated_time
             )
           `)
-          .eq('user_id', user.id)
+
+
+        if (household) {
+          query = query.or(`user_id.eq.${user.id}, household_id.eq.${household.id}`);
+        } else {
+          query = query.eq('user_id', user.id);
+        }
+
+        const { data: tasksData, error: tasksError } = await query
           .order('created_at', { ascending: true });
 
         if (tasksError) throw tasksError;
@@ -105,6 +115,8 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         const transformedTasks = (tasksData || []).map((item: any) => ({
           id: item.id,
           user_id: item.user_id,
+          household_id: item.household_id,
+          assigned_to: item.assigned_to,
           core_task_id: item.core_task_id,
           name: item.name,
           frequency: item.frequency || item.core_task?.frequency,
@@ -364,7 +376,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         {/* Greeting & Status */}
         <Box className="px-4 pt-2 pb-6">
           <Text className="text-3xl font-bold leading-tight mb-1 text-gray-900 dark:text-white">
-            {greeting}{displayName ? `,${'\n'}${displayName}! ☀️` : '! ☀️'}
+            {greeting}{displayName ? `, ${'\n'}${displayName} ! ☀️` : '! ☀️'}
           </Text>
           <Text className="text-gray-500 dark:text-gray-400 text-sm font-medium">
             Let's keep the house sparkling today.
@@ -392,7 +404,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             <View className="relative h-3 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
               <View
                 className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all duration-500"
-                style={{ width: `${getDailyProgress().percent}%` }}
+                style={{ width: `${getDailyProgress().percent}% ` }}
               />
             </View>
           </Card>
@@ -570,8 +582,14 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           taskDetails={{
             frequency: activeTask.frequency || activeTask.core_task?.frequency,
             room: activeTask.room || activeTask.core_task?.room,
-            dueDate: pendingTaskMap.get(activeTask.id)
+            frequency: activeTask.frequency || activeTask.core_task?.frequency,
+            room: activeTask.room || activeTask.core_task?.room,
+            dueDate: pendingTaskMap.get(activeTask.id),
+            assignedTo: activeTask.assigned_to,
+            householdId: activeTask.household_id
           }}
+          household={household}
+          members={householdMembers}
         />
       )
       }

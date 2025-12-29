@@ -88,6 +88,8 @@ export interface UserTask {
   room?: string;
   estimated_time?: number;
   created_at: string;
+  household_id?: string | null;
+  assigned_to?: string | null;
   // Joined data from core_tasks
   core_task?: CoreTask;
 }
@@ -101,4 +103,25 @@ export interface TaskEvent {
   completed_at: string | null;
   status: TaskEventStatus;
   created_at: string;
+}
+
+export interface Household {
+  id: string;
+  name: string;
+  owner_id: string;
+  invite_code: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface HouseholdMember {
+  id: string;
+  household_id: string;
+  user_id: string;
+  role: 'owner' | 'member';
+  joined_at: string;
+}
+
+export interface HouseholdMemberProfile extends HouseholdMember {
+  profile?: UserProfile;
 }

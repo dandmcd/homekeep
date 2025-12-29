@@ -1,5 +1,6 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, LinkingOptions } from '@react-navigation/native';
+import * as Linking from 'expo-linking';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -21,12 +22,29 @@ export type RootStackParamList = {
   Login: undefined;
   Home: undefined;
   About: undefined;
-  Settings: undefined;
+  Settings: { inviteCode?: string };
   CoreTasks: undefined;
   Calendar: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
+
+const prefix = Linking.createURL('/');
+
+const linking: LinkingOptions<RootStackParamList> = {
+  prefixes: [prefix, 'homekeep://'],
+  config: {
+    screens: {
+      Settings: {
+        path: 'join',
+        parse: {
+          inviteCode: (code: string) => code,
+        },
+      },
+    },
+  },
+};
+
 
 function Navigation() {
   const { session, loading } = useAuth();
@@ -97,7 +115,7 @@ export default function App() {
     <GluestackUIProvider mode="light">
       <SafeAreaProvider>
         <AuthProvider>
-          <NavigationContainer>
+          <NavigationContainer linking={linking}>
             <StatusBar style="auto" />
             <Navigation />
           </NavigationContainer>

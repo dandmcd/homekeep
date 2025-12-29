@@ -8,7 +8,7 @@ import React, {
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import { generateTaskEventsForUser } from "../lib/scheduling";
-import { UserTask, CoreTask, Frequency, UserProfile } from "../lib/database.types";
+import { UserTask, CoreTask, Frequency, UserProfile, Household, HouseholdMember, HouseholdMemberProfile } from "../lib/database.types";
 import * as WebBrowser from "expo-web-browser";
 import * as AuthSession from "expo-auth-session";
 import { makeRedirectUri } from "expo-auth-session";
@@ -30,6 +30,11 @@ interface AuthContextType {
     signUpWithEmail: (email: string, password: string) => Promise<void>;
     signOut: () => Promise<void>;
     resetAccount: () => Promise<void>;
+    household: Household | null;
+    createHousehold: (name: string) => Promise<void>;
+    joinHousehold: (code: string) => Promise<void>;
+    leaveHousehold: () => Promise<void>;
+    householdMembers: HouseholdMemberProfile[];
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -41,6 +46,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [loading, setLoading] = useState(true);
     const [isInitialized, setIsInitialized] = useState(false);
     const [initializingTasks, setInitializingTasks] = useState(false);
+    const [household, setHousehold] = useState<Household | null>(null);
+    const [householdMembers, setHouseholdMembers] = useState<HouseholdMemberProfile[]>([]);
 
     // Create redirect URI for OAuth
     const redirectUri = makeRedirectUri({
@@ -229,7 +236,131 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         console.log('handleUserInit finished');
+
+        // Fetch Household
+        const { data: memberData, error: memberError } = await supabase
+            .from('household_members')
+            .select('*, household:households(*)')
+            .eq('user_id', userId)
+            .maybeSingle(); // Use maybeSingle as user might not be in a household
+
+        if (memberError) {
+            console.error('Error fetching household member data:', memberError);
+        }
+
+        if (memberData && memberData.household) {
+            setHousehold(memberData.household as unknown as Household);
+
+            // Fetch all members
+            const { data: members } = await supabase
+                .from('household_members')
+                .select('*, profile:user_profiles(*)')
+                .eq('household_id', memberData.household.id);
+
+            if (members) {
+                setHouseholdMembers(members as unknown as HouseholdMemberProfile[]);
+            }
+        } else {
+            setHousehold(null);
+            setHouseholdMembers([]);
+        }
     }, [initializeUserTasks]);
+
+    const createHousehold = useCallback(async (name: string): Promise<void> => {
+        if (!user) return;
+        try {
+            setLoading(true);
+            const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+            // 1. Create Household
+            const { data: householdData, error: createError } = await supabase
+                .from('households')
+                .insert({
+                    name,
+                    owner_id: user.id,
+                    invite_code: inviteCode
+                })
+                .select()
+                .single();
+
+            if (createError) throw createError;
+
+            // 2. Add creator as member (owner)
+            const { error: memberError } = await supabase
+                .from('household_members')
+                .insert({
+                    household_id: householdData.id,
+                    user_id: user.id,
+                    role: 'owner'
+                });
+
+            if (memberError) throw memberError;
+
+            setHousehold(householdData);
+        } catch (error) {
+            console.error('Error creating household:', error);
+            throw error;
+        } finally {
+            setLoading(false);
+        }
+    }, [user]);
+
+    const joinHousehold = useCallback(async (code: string): Promise<void> => {
+        if (!user) return;
+        try {
+            setLoading(true);
+
+            // 1. Find household by code using RPC to bypass RLS
+            const { data: householdData, error: findError } = await supabase
+                .rpc('get_household_by_invite_code', { code })
+                .maybeSingle();
+
+            if (findError || !householdData) {
+                console.error('Error finding household:', findError);
+                throw new Error('Invalid invite code');
+            }
+
+            // 2. Add user as member
+            const { error: joinError } = await supabase
+                .from('household_members')
+                .insert({
+                    household_id: householdData.id,
+                    user_id: user.id,
+                    role: 'member'
+                });
+
+            if (joinError) throw joinError;
+
+            setHousehold(householdData);
+        } catch (error) {
+            console.error('Error joining household:', error);
+            throw error;
+        } finally {
+            setLoading(false);
+        }
+    }, [user]);
+
+    const leaveHousehold = useCallback(async (): Promise<void> => {
+        if (!user || !household) return;
+        try {
+            setLoading(true);
+
+            const { error } = await supabase
+                .from('household_members')
+                .delete()
+                .eq('household_id', household.id)
+                .eq('user_id', user.id);
+
+            if (error) throw error;
+
+            setHousehold(null);
+        } catch (error) {
+            console.error('Error leaving household:', error);
+            throw error;
+        } finally {
+            setLoading(false);
+        }
+    }, [user, household]);
 
     useEffect(() => {
         let isMounted = true;
@@ -418,6 +549,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signUpWithEmail,
         signOut,
         resetAccount,
+        household,
+        householdMembers,
+        createHousehold,
+        joinHousehold,
+        leaveHousehold,
     };
 
     return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

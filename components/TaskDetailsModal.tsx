@@ -7,7 +7,10 @@ import { Pressable } from '@/components/ui/pressable';
 import { MaterialIcons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, { useAnimatedProps, useSharedValue, withTiming, Easing, useAnimatedStyle, withSpring, FadeIn, FadeOut } from 'react-native-reanimated';
-import { frequencyLabels, Frequency } from '@/lib/database.types';
+import { frequencyLabels, Frequency, Household, HouseholdMemberProfile } from '@/lib/database.types';
+import { Switch } from 'react-native';
+import { UserAvatar } from '@/components/UserAvatar';
+import { supabase } from '@/lib/supabase';
 
 const { width } = Dimensions.get('window');
 
@@ -18,6 +21,9 @@ export interface TaskDetails {
     dueDate?: string;
     room?: string;
     description?: string;
+    id?: string;
+    householdId?: string | null;
+    assignedTo?: string | null;
 }
 
 interface TaskDetailsModalProps {
@@ -29,10 +35,52 @@ interface TaskDetailsModalProps {
     taskDetails?: TaskDetails;
 }
 
-export function TaskDetailsModal({ isVisible, onClose, onComplete, taskName, durationMinutes, taskDetails }: TaskDetailsModalProps) {
+
+
+export function TaskDetailsModal({ isVisible, onClose, onComplete, taskName, durationMinutes, taskDetails, household, members = [] }: TaskDetailsModalProps) {
     const [timeLeft, setTimeLeft] = useState(durationMinutes * 60);
     const [isActive, setIsActive] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
+
+    // Sharing State
+    const [isShared, setIsShared] = useState(!!taskDetails?.householdId);
+    const [assignedTo, setAssignedTo] = useState(taskDetails?.assignedTo);
+
+    useEffect(() => {
+        setIsShared(!!taskDetails?.householdId);
+        setAssignedTo(taskDetails?.assignedTo);
+    }, [taskDetails]);
+
+    const handleToggleShare = async (value: boolean) => {
+        if (!taskDetails?.id || !household) return;
+        setIsShared(value);
+
+        try {
+            await supabase
+                .from('user_tasks')
+                .update({
+                    household_id: value ? household.id : null,
+                    assigned_to: value ? assignedTo : null // Keep assignment if sharing, else clear? Actually if private, assigned_to doesn't make sense usually, or defaults to owner. Let's clear it or keep it as owner (me). For safety, clear it.
+                }).eq('id', taskDetails.id);
+        } catch (e) {
+            console.error(e);
+            setIsShared(!value); // revert
+        }
+    };
+
+    const handleAssign = async (userId: string) => {
+        if (!taskDetails?.id) return;
+        setAssignedTo(userId);
+
+        try {
+            await supabase
+                .from('user_tasks')
+                .update({ assigned_to: userId })
+                .eq('id', taskDetails.id);
+        } catch (e) {
+            console.error(e);
+        }
+    };
 
     const progress = useSharedValue(1);
     const detailsHeight = useSharedValue(0);
@@ -241,6 +289,54 @@ export function TaskDetailsModal({ isVisible, onClose, onComplete, taskName, dur
                                             <Text className="text-gray-900 dark:text-white font-medium">{taskDetails?.dueDate ? new Date(taskDetails.dueDate).toLocaleDateString() : 'Today'}</Text>
                                         </View>
                                     </View>
+
+                                    {/* Sharing Section */}
+                                    {household && (
+                                        <View className="pt-3 border-t border-gray-100 dark:border-gray-800 space-y-3">
+                                            <View className="flex-row items-center justify-between">
+                                                <View className="flex-row items-center space-x-3">
+                                                    <View className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 items-center justify-center">
+                                                        <MaterialIcons name="share" size={18} color="#3b82f6" />
+                                                    </View>
+                                                    <View>
+                                                        <Text className="text-xs text-gray-500 uppercase font-bold">Share with Household</Text>
+                                                        <Text className="text-gray-900 dark:text-white font-medium">{isShared ? 'Shared' : 'Private'}</Text>
+                                                    </View>
+                                                </View>
+                                                <Switch
+                                                    value={isShared}
+                                                    onValueChange={handleToggleShare}
+                                                    trackColor={{ false: '#e5e7eb', true: '#3b82f6' }}
+                                                />
+                                            </View>
+
+                                            {isShared && members.length > 0 && (
+                                                <View>
+                                                    <Text className="text-xs text-gray-500 uppercase font-bold mb-2 ml-1">Assigned To</Text>
+                                                    <View className="flex-row flex-wrap gap-2">
+                                                        {members.map((member) => {
+                                                            const isSelected = assignedTo === member.user_id;
+                                                            return (
+                                                                <Pressable
+                                                                    key={member.id}
+                                                                    onPress={() => handleAssign(member.user_id)}
+                                                                    className={`p-1 pr-3 rounded-full flex-row items-center space-x-2 border ${isSelected ? 'bg-primary/20 border-primary' : 'bg-gray-50 dark:bg-gray-800 border-transparent'}`}
+                                                                >
+                                                                    <UserAvatar
+                                                                        className="w-6 h-6"
+                                                                        textClassName="text-xs"
+                                                                    />
+                                                                    <Text className={`text-xs font-medium ${isSelected ? 'text-primary-dark' : 'text-gray-700 dark:text-gray-300'}`}>
+                                                                        {member.profile?.first_name || 'User'}
+                                                                    </Text>
+                                                                </Pressable>
+                                                            );
+                                                        })}
+                                                    </View>
+                                                </View>
+                                            )}
+                                        </View>
+                                    )}
                                 </View>
                             </Animated.View>
                         )}
