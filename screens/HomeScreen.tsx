@@ -19,7 +19,7 @@ import { View } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { UserAvatar } from '@/components/UserAvatar';
 import { FloatingBottomBar } from '@/components/FloatingBottomBar';
-import { TaskTimer } from '@/components/TaskTimer';
+import { TaskDetailsModal } from '@/components/TaskDetailsModal';
 
 // Custom helper component for consistent card styling
 function Card({ children, className, style }: { children: React.ReactNode; className?: string; style?: any }) {
@@ -561,12 +561,17 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       < FloatingBottomBar activeRoute="Home" />
 
       {activeTask && (
-        <TaskTimer
+        <TaskDetailsModal
           isVisible={isTimerVisible}
           onClose={() => setIsTimerVisible(false)}
           onComplete={() => handleMarkDone(activeTask)}
           taskName={activeTask.name || activeTask.core_task?.name || 'Task'}
           durationMinutes={activeTask.estimated_time || 15}
+          taskDetails={{
+            frequency: activeTask.frequency || activeTask.core_task?.frequency,
+            room: activeTask.room || activeTask.core_task?.room,
+            dueDate: pendingTaskMap.get(activeTask.id)
+          }}
         />
       )
       }

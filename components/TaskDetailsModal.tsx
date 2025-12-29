@@ -6,25 +6,35 @@ import { HStack } from '@/components/ui/hstack';
 import { Pressable } from '@/components/ui/pressable';
 import { MaterialIcons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
-import Animated, { useAnimatedProps, useSharedValue, withTiming, Easing } from 'react-native-reanimated';
+import Animated, { useAnimatedProps, useSharedValue, withTiming, Easing, useAnimatedStyle, withSpring, FadeIn, FadeOut } from 'react-native-reanimated';
 
 const { width } = Dimensions.get('window');
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
 
-interface TaskTimerProps {
+export interface TaskDetails {
+    frequency?: string;
+    dueDate?: string;
+    room?: string;
+    description?: string;
+}
+
+interface TaskDetailsModalProps {
     isVisible: boolean;
     onClose: () => void;
     onComplete: () => void;
     taskName: string;
     durationMinutes: number;
+    taskDetails?: TaskDetails;
 }
 
-export function TaskTimer({ isVisible, onClose, onComplete, taskName, durationMinutes }: TaskTimerProps) {
+export function TaskDetailsModal({ isVisible, onClose, onComplete, taskName, durationMinutes, taskDetails }: TaskDetailsModalProps) {
     const [timeLeft, setTimeLeft] = useState(durationMinutes * 60);
     const [isActive, setIsActive] = useState(false);
+    const [showDetails, setShowDetails] = useState(false);
 
     const progress = useSharedValue(1);
+    const detailsHeight = useSharedValue(0);
 
     // Cap size at 300px for larger screens to prevent overflow
     const timerSize = Math.min(width * 0.8, 300);
@@ -37,6 +47,8 @@ export function TaskTimer({ isVisible, onClose, onComplete, taskName, durationMi
             setTimeLeft(durationMinutes * 60);
             setIsActive(false);
             progress.value = 1;
+            setShowDetails(false);
+            detailsHeight.value = 0;
         }
     }, [isVisible, durationMinutes]);
 
@@ -68,15 +80,43 @@ export function TaskTimer({ isVisible, onClose, onComplete, taskName, durationMi
         setIsActive(!isActive);
     };
 
+    const toggleDetails = () => {
+        setShowDetails(!showDetails);
+        // Animate roughly 0 -> 150 height. 
+        // Accurate height measuring with reanimated needs onLayout, keeping it simple fixed height for now or just visual standard spring
+        // Actually, let's just use boolean toggle for logic and maybe opacity/transform if needed, 
+        // but for a simple modal, a springy height is nice.
+        detailsHeight.value = withSpring(showDetails ? 0 : 1, { damping: 15 });
+    };
+
     const animatedProps = useAnimatedProps(() => ({
         strokeDashoffset: CIRCLE_LENGTH * (1 - progress.value),
     }));
+
+    const detailsStyle = useAnimatedStyle(() => {
+        return {
+            opacity: detailsHeight.value,
+            transform: [
+                { translateY: (1 - detailsHeight.value) * -20 },
+                { scale: 0.9 + (detailsHeight.value * 0.1) }
+            ],
+            height: showDetails ? 'auto' : 0, // Fallback for layout
+            overflow: 'hidden',
+            marginTop: detailsHeight.value * 24 // 6 * 4
+        };
+    });
 
     const formatTime = (seconds: number) => {
         const mins = Math.floor(seconds / 60);
         const secs = seconds % 60;
         return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
     };
+
+    // Helper to format frequency nicely
+    const formatFrequency = (freq?: string) => {
+        if (!freq) return 'One-time';
+        return freq.charAt(0).toUpperCase() + freq.slice(1);
+    }
 
     return (
         <Modal visible={isVisible} animationType="slide" presentationStyle="pageSheet" transparent={false}>
@@ -146,6 +186,60 @@ export function TaskTimer({ isVisible, onClose, onComplete, taskName, durationMi
                         </View>
                     </View>
 
+                    {/* Details Expander */}
+                    <View className="w-full max-w-[300px] mt-8 items-center">
+                        <Pressable onPress={toggleDetails} className="flex-row items-center space-x-1 p-2">
+                            <Text className="text-primary font-bold text-sm">
+                                {showDetails ? 'Hide Details' : 'Show Details'}
+                            </Text>
+                            <MaterialIcons
+                                name={showDetails ? "keyboard-arrow-up" : "keyboard-arrow-down"}
+                                size={20}
+                                color="#5bec13"
+                            />
+                        </Pressable>
+
+                        {showDetails && (
+                            <Animated.View
+                                entering={FadeIn.duration(300)}
+                                exiting={FadeOut.duration(200)}
+                                className="w-full bg-surface-light dark:bg-surface-dark border border-gray-100 dark:border-gray-800 rounded-xl p-4 mt-4 shadow-sm"
+                            >
+                                <View className="space-y-3">
+                                    <View className="flex-row items-center space-x-3">
+                                        <View className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 items-center justify-center">
+                                            <MaterialIcons name="loop" size={18} color="#5bec13" />
+                                        </View>
+                                        <View>
+                                            <Text className="text-xs text-gray-500 uppercase font-bold">Frequency</Text>
+                                            <Text className="text-gray-900 dark:text-white font-medium">{formatFrequency(taskDetails?.frequency)}</Text>
+                                        </View>
+                                    </View>
+
+                                    <View className="flex-row items-center space-x-3">
+                                        <View className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 items-center justify-center">
+                                            <MaterialIcons name="home" size={18} color="#5bec13" />
+                                        </View>
+                                        <View>
+                                            <Text className="text-xs text-gray-500 uppercase font-bold">Room</Text>
+                                            <Text className="text-gray-900 dark:text-white font-medium">{taskDetails?.room || 'General'}</Text>
+                                        </View>
+                                    </View>
+
+                                    <View className="flex-row items-center space-x-3">
+                                        <View className="w-8 h-8 rounded-full bg-green-100 dark:bg-green-900/30 items-center justify-center">
+                                            <MaterialIcons name="event" size={18} color="#5bec13" />
+                                        </View>
+                                        <View>
+                                            <Text className="text-xs text-gray-500 uppercase font-bold">Due Date</Text>
+                                            <Text className="text-gray-900 dark:text-white font-medium">{taskDetails?.dueDate ? new Date(taskDetails.dueDate).toLocaleDateString() : 'Today'}</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            </Animated.View>
+                        )}
+                    </View>
+
                 </Box>
             </View>
         </Modal>
@@ -167,3 +261,4 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
 });
+

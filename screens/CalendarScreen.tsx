@@ -16,7 +16,7 @@ import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { UserAvatar } from '@/components/UserAvatar';
 import { FloatingBottomBar } from '@/components/FloatingBottomBar';
 import { Calendar, DateData, LocaleConfig } from 'react-native-calendars';
-import { TaskTimer } from '@/components/TaskTimer';
+import { TaskDetailsModal } from '@/components/TaskDetailsModal';
 
 type RootStackParamList = {
     Home: undefined;
@@ -470,12 +470,17 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
             <FloatingBottomBar activeRoute="Calendar" />
 
             {activeTask && (
-                <TaskTimer
+                <TaskDetailsModal
                     isVisible={isTimerVisible}
                     onClose={() => setIsTimerVisible(false)}
                     onComplete={() => handleToggleStatus(activeTask)}
                     taskName={activeTask.name}
                     durationMinutes={activeTask.estimated_time || 15}
+                    taskDetails={{
+                        frequency: activeTask.frequency,
+                        room: activeTask.room,
+                        dueDate: activeTask.due_date
+                    }}
                 />
             )}
         </View>
