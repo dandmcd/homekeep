@@ -50,6 +50,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   const { user, userProfile, isInitialized, initializingTasks } = useAuth();
   const [tasks, setTasks] = useState<UserTask[]>([]);
   const [completedTaskIds, setCompletedTaskIds] = useState<Set<string>>(new Set());
+  const [pendingTaskMap, setPendingTaskMap] = useState<Map<string, string>>(new Map()); // taskId -> dueDate
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -115,6 +116,8 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
         setTasks(transformedTasks);
 
+        const taskIds = transformedTasks.map(t => t.id);
+
         // 2. Fetch Todays Events (Completed Tasks)
         // Get start of today in ISO format
         const today = new Date();
@@ -134,6 +137,32 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         const events = (eventsData as TaskEvent[]) || [];
         setCompletedTaskIds(new Set(events.map(e => e.user_task_id)));
 
+        // 3. Fetch Pending Events (For Due Dates)
+        // We need to know which tasks are actually due today or overdue
+        if (taskIds.length > 0) {
+          const { data: pendingData, error: pendingError } = await supabase
+            .from('task_events')
+            .select('*')
+            .in('user_task_id', taskIds)
+            .eq('status', 'pending');
+
+          if (pendingError) {
+            console.warn('Error fetching pending events:', pendingError);
+          } else {
+            const pendingMap = new Map<string, string>();
+            (pendingData as TaskEvent[]).forEach(event => {
+              // If there are multiple pending events for a task, we generally want the earliest one (due first)
+              // or just any that makes it "due". 
+              // Let's store the earliest due date found for each task.
+              const currentDue = pendingMap.get(event.user_task_id);
+              if (!currentDue || event.due_date < currentDue) {
+                pendingMap.set(event.user_task_id, event.due_date);
+              }
+            });
+            setPendingTaskMap(pendingMap);
+          }
+        }
+
       } catch (err) {
         console.error('Error fetching data:', err);
         setError(err instanceof Error ? err.message : 'Failed to load data');
@@ -151,9 +180,26 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     Alert.alert('Not implemented', `Delete ${taskName} functionality coming soon in this UI.`);
   };
 
+  const isTaskRelevant = (task: UserTask) => {
+    // 1. If it's completed today, it's NOT relevant for the "To Do" list (but handled by getFocusTasks filtering already)
+    // BUT caller handles completion check usually. Let's assume this checks "should it appear in the potential list"
+
+    // Always show Daily tasks
+    if (task.frequency === 'daily') return true;
+
+    // Show if we have a pending event that is due today or in the past
+    const dueDate = pendingTaskMap.get(task.id);
+    if (dueDate) {
+      const todayStr = new Date().toISOString().split('T')[0];
+      return dueDate <= todayStr;
+    }
+
+    return false;
+  };
+
   const getFocusTasks = () => {
-    // Filter tasks not completed today
-    const activeTasks = tasks.filter(t => !completedTaskIds.has(t.id));
+    // Filter tasks not completed today AND are relevant
+    const activeTasks = tasks.filter(t => !completedTaskIds.has(t.id) && isTaskRelevant(t));
 
     // Priority Score Logic (Lower is better)
     // 1. Overdue (Not implemented yet, assumed separate)
@@ -410,7 +456,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         <Box className="px-4 mb-8">
           <Text className="text-lg font-bold text-gray-900 dark:text-white mb-3">Today's Tasks</Text>
           <VStack className="space-y-2">
-            {tasks.filter(t => !completedTaskIds.has(t.id) && !activeFocusTaskIds.has(t.id))
+            {tasks.filter(t => !completedTaskIds.has(t.id) && !activeFocusTaskIds.has(t.id) && isTaskRelevant(t))
               .map((task) => {
                 const iconName = task.core_task?.icon;
                 return (
