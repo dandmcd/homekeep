@@ -6,11 +6,7 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "web": "expo start --web",
-    "test": "playwright test",
-    "test:ui": "playwright test --ui",
-    "test:headed": "playwright test --headed",
-    "test:report": "playwright show-report"
+    "web": "expo start --web"
   },
   "dependencies": {
     "@expo/html-elements": "^0.10.1",
@@ -55,7 +51,6 @@
   },
   "private": true,
   "devDependencies": {
-    "@playwright/test": "^1.57.0",
     "@types/react": "~19.1.10",
     "@types/react-native": "^0.72.8",
     "babel-plugin-module-resolver": "^5.0.0",
