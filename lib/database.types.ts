@@ -19,7 +19,7 @@ export type Frequency =
 /**
  * Task set types for onboarding selection
  */
-export type TaskSet = 'apartment' | 'homeowner';
+export type TaskSet = 'apartment' | 'homeowner' | 'pool_owner' | 'pet_owner';
 
 export interface CoreTask {
   id: string;

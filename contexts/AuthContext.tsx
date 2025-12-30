@@ -31,7 +31,7 @@ interface AuthContextType {
     signUpWithEmail: (email: string, password: string) => Promise<void>;
     signOut: () => Promise<void>;
     resetAccount: () => Promise<void>;
-    initializeWithTaskSet: (taskSet: TaskSet | 'empty') => Promise<void>;
+    initializeWithTaskSet: (taskSets: TaskSet[] | 'empty') => Promise<void>;
     household: Household | null;
     createHousehold: (name: string) => Promise<void>;
     joinHousehold: (code: string) => Promise<void>;
@@ -167,8 +167,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsInitialized(true);
     }, []);
 
-    // Initialize user with selected task set (called from onboarding screen)
-    const initializeWithTaskSet = useCallback(async (taskSet: TaskSet | 'empty'): Promise<void> => {
+    // Initialize user with selected task sets (called from onboarding screen)
+    const initializeWithTaskSet = useCallback(async (taskSets: TaskSet[] | 'empty'): Promise<void> => {
         if (!user) return;
 
         const userId = user.id;
@@ -182,6 +182,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const firstName = nameParts[0] || '';
             const lastName = nameParts.slice(1).join(' ') || '';
 
+            // Determine primary task set (first non-addon set)
+            const primarySet = taskSets === 'empty' ? null :
+                (taskSets.find(s => s === 'apartment' || s === 'homeowner') || taskSets[0]);
+
             // First, create or update user profile
             const { data: profile, error: profileError } = await supabase
                 .from('user_profiles')
@@ -190,7 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         user_id: userId,
                         initialized: false,
                         tutorial_completed: false,
-                        selected_task_set: taskSet === 'empty' ? null : taskSet,
+                        selected_task_set: primarySet,
                         first_name: firstName,
                         last_name: lastName,
                         updated_at: new Date().toISOString(),
@@ -207,13 +211,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 throw profileError;
             }
 
-            // If not 'empty', create tasks from the selected set
-            if (taskSet !== 'empty') {
-                // Get core tasks for the selected set
+            // If not 'empty', create tasks from the selected sets
+            if (taskSets !== 'empty' && taskSets.length > 0) {
+                // Get core tasks for any of the selected sets using OR filter
+                // Build filter for tasks that overlap with any of the selected sets
                 const { data: coreTasks, error: coreTasksError } = await supabase
                     .from('core_tasks')
                     .select('id, frequency, task_set')
-                    .contains('task_set', [taskSet]);
+                    .or(taskSets.map(set => `task_set.cs.{${set}}`).join(','));
 
                 if (coreTasksError) {
                     console.error('Error fetching core tasks:', coreTasksError);
@@ -485,18 +490,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 throw new Error('Invalid invite code');
             }
 
+            const household = householdData as unknown as Household;
+
             // 2. Add user as member
             const { error: joinError } = await supabase
                 .from('household_members')
                 .insert({
-                    household_id: householdData.id,
+                    household_id: household.id,
                     user_id: user.id,
                     role: 'member'
                 });
 
             if (joinError) throw joinError;
 
-            setHousehold(householdData);
+            setHousehold(household);
         } catch (error) {
             console.error('Error joining household:', error);
             throw error;

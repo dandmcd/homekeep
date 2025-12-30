@@ -203,11 +203,29 @@ export default function CoreTasksScreen({ navigation }: CoreTasksScreenProps) {
                         <Text className="text-base font-bold text-gray-900 dark:text-white">
                           {task.name}
                         </Text>
-                        <Text className="text-xs text-gray-400">
-                          {task.room ? `${task.room} • ` : ''}
-                          {frequencyLabels[task.frequency]}
-                          {task.estimated_time ? ` • ${task.estimated_time} min` : ''}
-                        </Text>
+                        <View className="flex-row items-center">
+                          <Text className="text-xs text-gray-400">
+                            {task.room ? `${task.room} • ` : ''}
+                            {frequencyLabels[task.frequency]}
+                            {task.estimated_time ? ` • ${task.estimated_time} min` : ''}
+                          </Text>
+                          {isAdmin && task.task_set && task.task_set.length > 0 && (
+                            <View className="flex-row items-center ml-2">
+                              {task.task_set.includes('apartment') && (
+                                <MaterialIcons name="business" size={14} color="#22c55e" style={{ marginRight: 4 }} />
+                              )}
+                              {task.task_set.includes('homeowner') && (
+                                <MaterialIcons name="home" size={14} color="#3b82f6" style={{ marginRight: 4 }} />
+                              )}
+                              {task.task_set.includes('pool_owner') && (
+                                <MaterialIcons name="pool" size={14} color="#00CED1" style={{ marginRight: 4 }} />
+                              )}
+                              {task.task_set.includes('pet_owner') && (
+                                <MaterialIcons name="pets" size={14} color="#FF9500" />
+                              )}
+                            </View>
+                          )}
+                        </View>
                       </View>
 
                       {isAdmin ? (

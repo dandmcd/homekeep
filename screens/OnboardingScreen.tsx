@@ -12,7 +12,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { TaskSet } from '@/lib/database.types';
 import { Ionicons } from '@expo/vector-icons';
 
-type TaskSetOption = TaskSet | 'empty';
+type PrimaryTaskSet = 'apartment' | 'homeowner' | 'empty';
+type AddonTaskSet = 'pool_owner' | 'pet_owner';
 
 interface TaskSetCardProps {
     icon: keyof typeof Ionicons.glyphMap;
@@ -48,22 +49,90 @@ function TaskSetCard({ icon, title, description, selected, onSelect, color }: Ta
     );
 }
 
+interface AddonCardProps {
+    icon: keyof typeof Ionicons.glyphMap;
+    title: string;
+    description: string;
+    checked: boolean;
+    onToggle: () => void;
+    color: string;
+}
+
+function AddonCard({ icon, title, description, checked, onToggle, color }: AddonCardProps) {
+    return (
+        <TouchableOpacity
+            onPress={onToggle}
+            style={[
+                styles.card,
+                checked && styles.cardSelected,
+                checked && { borderColor: color },
+            ]}
+            activeOpacity={0.8}
+        >
+            <View style={[styles.iconContainer, { backgroundColor: color + '20' }]}>
+                <Ionicons name={icon} size={32} color={color} />
+            </View>
+            <VStack space="xs" className="flex-1">
+                <Text className="text-lg font-bold text-typography-900">{title}</Text>
+                <Text className="text-sm text-typography-500">{description}</Text>
+            </VStack>
+            <View style={[styles.checkbox, checked && { backgroundColor: color, borderColor: color }]}>
+                {checked && <Ionicons name="checkmark" size={16} color="#fff" />}
+            </View>
+        </TouchableOpacity>
+    );
+}
+
 export default function OnboardingScreen() {
     const { initializeWithTaskSet, loading } = useAuth();
-    const [selectedSet, setSelectedSet] = useState<TaskSetOption | null>(null);
+    const [step, setStep] = useState<1 | 2>(1);
+    const [primarySet, setPrimarySet] = useState<PrimaryTaskSet | null>(null);
+    const [addons, setAddons] = useState<AddonTaskSet[]>([]);
     const [isInitializing, setIsInitializing] = useState(false);
 
+    const toggleAddon = (addon: AddonTaskSet) => {
+        setAddons(prev =>
+            prev.includes(addon)
+                ? prev.filter(a => a !== addon)
+                : [...prev, addon]
+        );
+    };
+
     const handleContinue = async () => {
-        if (!selectedSet) return;
+        if (step === 1 && primarySet) {
+            if (primarySet === 'empty') {
+                // Skip step 2 for empty selection
+                await finishOnboarding();
+            } else {
+                setStep(2);
+            }
+        } else if (step === 2) {
+            await finishOnboarding();
+        }
+    };
+
+    const finishOnboarding = async () => {
+        if (!primarySet) return;
 
         try {
             setIsInitializing(true);
-            await initializeWithTaskSet(selectedSet);
+            if (primarySet === 'empty') {
+                await initializeWithTaskSet('empty');
+            } else {
+                // Combine primary set with addons
+                const taskSets: TaskSet[] = [primarySet, ...addons];
+                await initializeWithTaskSet(taskSets);
+            }
         } catch (error) {
             console.error('Failed to initialize:', error);
-            // Could show an alert here
         } finally {
             setIsInitializing(false);
+        }
+    };
+
+    const handleBack = () => {
+        if (step === 2) {
+            setStep(1);
         }
     };
 
@@ -87,76 +156,132 @@ export default function OnboardingScreen() {
                         <Ionicons name="home" size={48} color="#007AFF" />
                     </View>
                     <Heading size="2xl" className="text-typography-900 text-center mt-4">
-                        Welcome to Homekeep
+                        {step === 1 ? 'Welcome to Homekeep' : 'Optional Add-ons'}
                     </Heading>
                     <Text className="text-typography-500 text-center mt-2 text-base px-4">
-                        Your personal home maintenance assistant. Let's get you set up with
-                        the right tasks for your living situation.
+                        {step === 1
+                            ? "Your personal home maintenance assistant. Let's get you set up with the right tasks for your living situation."
+                            : 'Do you have any of these? Add specialized maintenance tasks.'}
                     </Text>
                 </View>
 
-                {/* Task Set Selection */}
-                <VStack space="md" className="w-full px-5 mt-8">
-                    <Text className="text-lg font-semibold text-typography-900 mb-2">
-                        Choose your starting point:
-                    </Text>
+                {/* Step Indicator */}
+                <HStack space="sm" className="justify-center mt-6">
+                    <View style={[styles.stepDot, step >= 1 && styles.stepDotActive]} />
+                    <View style={[styles.stepDot, step >= 2 && styles.stepDotActive]} />
+                </HStack>
 
-                    <TaskSetCard
-                        icon="add-circle-outline"
-                        title="Start Fresh"
-                        description="Begin with an empty slate. Add tasks as you need them."
-                        selected={selectedSet === 'empty'}
-                        onSelect={() => setSelectedSet('empty')}
-                        color="#8E8E93"
-                    />
+                {step === 1 ? (
+                    /* Step 1: Primary Task Set Selection */
+                    <VStack space="md" className="w-full px-5 mt-8">
+                        <Text className="text-lg font-semibold text-typography-900 mb-2">
+                            Choose your starting point:
+                        </Text>
 
-                    <TaskSetCard
-                        icon="business-outline"
-                        title="Apartment Living"
-                        description="Indoor cleaning and maintenance tasks perfect for renters."
-                        selected={selectedSet === 'apartment'}
-                        onSelect={() => setSelectedSet('apartment')}
-                        color="#34C759"
-                    />
+                        <TaskSetCard
+                            icon="add-circle-outline"
+                            title="Start Fresh"
+                            description="Begin with an empty slate. Add tasks as you need them."
+                            selected={primarySet === 'empty'}
+                            onSelect={() => setPrimarySet('empty')}
+                            color="#8E8E93"
+                        />
 
-                    <TaskSetCard
-                        icon="home-outline"
-                        title="Homeowner"
-                        description="Complete task set including exterior, yard, and seasonal maintenance."
-                        selected={selectedSet === 'homeowner'}
-                        onSelect={() => setSelectedSet('homeowner')}
-                        color="#007AFF"
-                    />
-                </VStack>
+                        <TaskSetCard
+                            icon="business-outline"
+                            title="Apartment Living"
+                            description="Indoor cleaning and maintenance tasks perfect for renters."
+                            selected={primarySet === 'apartment'}
+                            onSelect={() => setPrimarySet('apartment')}
+                            color="#34C759"
+                        />
 
-                {/* Info Note */}
-                <View style={styles.infoBox}>
-                    <Ionicons name="information-circle-outline" size={20} color="#8E8E93" />
-                    <Text className="text-sm text-typography-500 flex-1 ml-2">
-                        You can always add, remove, or customize tasks later from the settings.
-                    </Text>
-                </View>
+                        <TaskSetCard
+                            icon="home-outline"
+                            title="Homeowner"
+                            description="Complete task set including exterior, yard, and seasonal maintenance."
+                            selected={primarySet === 'homeowner'}
+                            onSelect={() => setPrimarySet('homeowner')}
+                            color="#007AFF"
+                        />
+                    </VStack>
+                ) : (
+                    /* Step 2: Add-on Task Sets */
+                    <VStack space="md" className="w-full px-5 mt-8">
+                        <Text className="text-lg font-semibold text-typography-900 mb-2">
+                            Select any that apply (optional):
+                        </Text>
+
+                        <AddonCard
+                            icon="water-outline"
+                            title="Pool Owner"
+                            description="Pool maintenance including water chemistry, cleaning, and seasonal open/close."
+                            checked={addons.includes('pool_owner')}
+                            onToggle={() => toggleAddon('pool_owner')}
+                            color="#00CED1"
+                        />
+
+                        <AddonCard
+                            icon="paw-outline"
+                            title="Pet Owner"
+                            description="Pet care tasks like bedding wash, grooming, and cleaning pet areas."
+                            checked={addons.includes('pet_owner')}
+                            onToggle={() => toggleAddon('pet_owner')}
+                            color="#FF9500"
+                        />
+
+                        <View style={styles.infoBox}>
+                            <Ionicons name="information-circle-outline" size={20} color="#8E8E93" />
+                            <Text className="text-sm text-typography-500 flex-1 ml-2">
+                                You can skip this step and add these later from settings.
+                            </Text>
+                        </View>
+                    </VStack>
+                )}
+
+                {step === 1 && (
+                    /* Info Note for Step 1 */
+                    <View style={styles.infoBox}>
+                        <Ionicons name="information-circle-outline" size={20} color="#8E8E93" />
+                        <Text className="text-sm text-typography-500 flex-1 ml-2">
+                            You can always add, remove, or customize tasks later from the settings.
+                        </Text>
+                    </View>
+                )}
             </ScrollView>
 
-            {/* Bottom Button */}
+            {/* Bottom Buttons */}
             <View style={styles.bottomBar}>
+                {step === 2 && (
+                    <Button
+                        size="xl"
+                        variant="outline"
+                        onPress={handleBack}
+                        className="flex-1 mr-3"
+                        style={styles.backButton}
+                    >
+                        <ButtonText className="text-lg font-semibold text-typography-700">
+                            Back
+                        </ButtonText>
+                    </Button>
+                )}
                 <Button
                     size="xl"
                     variant="solid"
                     action="primary"
                     onPress={handleContinue}
-                    disabled={!selectedSet || isInitializing}
-                    className="w-full"
+                    disabled={(step === 1 && !primarySet) || isInitializing}
+                    className={step === 2 ? "flex-1" : "w-full"}
                     style={[
                         styles.continueButton,
-                        !selectedSet && styles.buttonDisabled,
+                        (step === 1 && !primarySet) && styles.buttonDisabled,
                     ]}
                 >
                     {isInitializing ? (
                         <Spinner size="sm" color="white" />
                     ) : (
                         <ButtonText className="text-lg font-semibold">
-                            Get Started
+                            {step === 1 ? 'Continue' : 'Get Started'}
                         </ButtonText>
                     )}
                 </Button>
@@ -186,6 +311,16 @@ const styles = StyleSheet.create({
         backgroundColor: '#E5F1FF',
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    stepDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#D1D1D6',
+    },
+    stepDotActive: {
+        backgroundColor: '#007AFF',
+        width: 24,
     },
     card: {
         flexDirection: 'row',
@@ -228,6 +363,16 @@ const styles = StyleSheet.create({
         height: 12,
         borderRadius: 6,
     },
+    checkbox: {
+        width: 24,
+        height: 24,
+        borderRadius: 6,
+        borderWidth: 2,
+        borderColor: '#D1D1D6',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginLeft: 8,
+    },
     infoBox: {
         flexDirection: 'row',
         alignItems: 'flex-start',
@@ -248,6 +393,11 @@ const styles = StyleSheet.create({
         paddingBottom: 34,
         borderTopWidth: 1,
         borderTopColor: '#E5E5EA',
+        flexDirection: 'row',
+    },
+    backButton: {
+        borderRadius: 14,
+        height: 56,
     },
     continueButton: {
         borderRadius: 14,

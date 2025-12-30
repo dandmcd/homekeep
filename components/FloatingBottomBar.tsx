@@ -44,8 +44,8 @@ export function FloatingBottomBar({ activeRoute }: FloatingBottomBarProps) {
 
                 {/* Main FAB */}
                 <Pressable
-                    className="w-14 h-14 bg-primary rounded-full items-center justify-center -mt-8 mb-1 border-4 border-background-light dark:border-background-dark shadow-lg active:scale-95 transition-transform"
-                    style={{ shadowColor: '#5bec13', shadowOpacity: 0.4, shadowRadius: 20, elevation: 5 }}
+                    className="w-14 h-14 bg-primary rounded-full items-center justify-center -mt-8 mb-1 border-4 border-white dark:border-gray-900 shadow-2xl active:scale-95 transition-transform"
+                    style={{ shadowColor: '#000', shadowOpacity: 0.3, shadowRadius: 10, shadowOffset: { width: 0, height: 4 }, elevation: 10 }}
                     onPress={() => navigation.navigate('CoreTasks')}
                 >
                     <MaterialIcons name="add" size={32} color="#131811" />

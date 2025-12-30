@@ -257,47 +257,91 @@ export function ManageCoreTaskModal({
                                 <Text className="text-xs text-gray-400 mb-3">
                                     Select which onboarding sets should include this task
                                 </Text>
-                                <HStack className="space-x-3">
-                                    <Pressable
-                                        onPress={() => toggleTaskSet('apartment')}
-                                        className={`flex-1 p-4 rounded-xl border flex-row items-center justify-center ${taskSets.includes('apartment')
+                                <VStack className="space-y-3">
+                                    <HStack className="space-x-3">
+                                        <Pressable
+                                            onPress={() => toggleTaskSet('apartment')}
+                                            className={`flex-1 p-4 rounded-xl border flex-row items-center justify-center ${taskSets.includes('apartment')
                                                 ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700'
                                                 : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-                                            }`}
-                                    >
-                                        <MaterialIcons
-                                            name="business"
-                                            size={20}
-                                            color={taskSets.includes('apartment') ? '#22c55e' : '#9ca3af'}
-                                        />
-                                        <Text className={`ml-2 font-medium ${taskSets.includes('apartment')
+                                                }`}
+                                        >
+                                            <MaterialIcons
+                                                name="business"
+                                                size={20}
+                                                color={taskSets.includes('apartment') ? '#22c55e' : '#9ca3af'}
+                                            />
+                                            <Text className={`ml-2 font-medium ${taskSets.includes('apartment')
                                                 ? 'text-green-700 dark:text-green-400'
                                                 : 'text-gray-600 dark:text-gray-400'
-                                            }`}>
-                                            Apartment
-                                        </Text>
-                                    </Pressable>
+                                                }`}>
+                                                Apartment
+                                            </Text>
+                                        </Pressable>
 
-                                    <Pressable
-                                        onPress={() => toggleTaskSet('homeowner')}
-                                        className={`flex-1 p-4 rounded-xl border flex-row items-center justify-center ${taskSets.includes('homeowner')
+                                        <Pressable
+                                            onPress={() => toggleTaskSet('homeowner')}
+                                            className={`flex-1 p-4 rounded-xl border flex-row items-center justify-center ${taskSets.includes('homeowner')
                                                 ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700'
                                                 : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
-                                            }`}
-                                    >
-                                        <MaterialIcons
-                                            name="home"
-                                            size={20}
-                                            color={taskSets.includes('homeowner') ? '#3b82f6' : '#9ca3af'}
-                                        />
-                                        <Text className={`ml-2 font-medium ${taskSets.includes('homeowner')
+                                                }`}
+                                        >
+                                            <MaterialIcons
+                                                name="home"
+                                                size={20}
+                                                color={taskSets.includes('homeowner') ? '#3b82f6' : '#9ca3af'}
+                                            />
+                                            <Text className={`ml-2 font-medium ${taskSets.includes('homeowner')
                                                 ? 'text-blue-700 dark:text-blue-400'
                                                 : 'text-gray-600 dark:text-gray-400'
-                                            }`}>
-                                            Homeowner
-                                        </Text>
-                                    </Pressable>
-                                </HStack>
+                                                }`}>
+                                                Homeowner
+                                            </Text>
+                                        </Pressable>
+                                    </HStack>
+
+                                    <HStack className="space-x-3">
+                                        <Pressable
+                                            onPress={() => toggleTaskSet('pool_owner')}
+                                            className={`flex-1 p-4 rounded-xl border flex-row items-center justify-center ${taskSets.includes('pool_owner')
+                                                ? 'bg-cyan-50 dark:bg-cyan-900/20 border-cyan-300 dark:border-cyan-700'
+                                                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                                                }`}
+                                        >
+                                            <MaterialIcons
+                                                name="pool"
+                                                size={20}
+                                                color={taskSets.includes('pool_owner') ? '#00CED1' : '#9ca3af'}
+                                            />
+                                            <Text className={`ml-2 font-medium ${taskSets.includes('pool_owner')
+                                                ? 'text-cyan-700 dark:text-cyan-400'
+                                                : 'text-gray-600 dark:text-gray-400'
+                                                }`}>
+                                                Pool
+                                            </Text>
+                                        </Pressable>
+
+                                        <Pressable
+                                            onPress={() => toggleTaskSet('pet_owner')}
+                                            className={`flex-1 p-4 rounded-xl border flex-row items-center justify-center ${taskSets.includes('pet_owner')
+                                                ? 'bg-orange-50 dark:bg-orange-900/20 border-orange-300 dark:border-orange-700'
+                                                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                                                }`}
+                                        >
+                                            <MaterialIcons
+                                                name="pets"
+                                                size={20}
+                                                color={taskSets.includes('pet_owner') ? '#FF9500' : '#9ca3af'}
+                                            />
+                                            <Text className={`ml-2 font-medium ${taskSets.includes('pet_owner')
+                                                ? 'text-orange-700 dark:text-orange-400'
+                                                : 'text-gray-600 dark:text-gray-400'
+                                                }`}>
+                                                Pet
+                                            </Text>
+                                        </Pressable>
+                                    </HStack>
+                                </VStack>
                             </Box>
 
                             {/* Actions */}
