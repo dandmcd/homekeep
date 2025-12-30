@@ -6,7 +6,7 @@ import { HStack } from '@/components/ui/hstack';
 import { VStack } from '@/components/ui/vstack';
 import { Spinner } from '@/components/ui/spinner';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { CoreTask, Frequency, frequencyLabels, frequencyOrder } from '@/lib/database.types';
+import { CoreTask, Frequency, frequencyLabels, frequencyOrder, TaskSet } from '@/lib/database.types';
 import { supabase } from '@/lib/supabase';
 
 interface ManageCoreTaskModalProps {
@@ -27,6 +27,7 @@ export function ManageCoreTaskModal({
     const [room, setRoom] = useState('');
     const [estimatedTime, setEstimatedTime] = useState('');
     const [icon, setIcon] = useState('');
+    const [taskSets, setTaskSets] = useState<TaskSet[]>(['homeowner']);
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -38,6 +39,7 @@ export function ManageCoreTaskModal({
                 setRoom(taskToEdit.room || '');
                 setEstimatedTime(taskToEdit.estimated_time?.toString() || '');
                 setIcon(taskToEdit.icon || '');
+                setTaskSets(taskToEdit.task_set || ['homeowner']);
             } else {
                 // Reset for new task
                 setName('');
@@ -45,10 +47,23 @@ export function ManageCoreTaskModal({
                 setRoom('');
                 setEstimatedTime('');
                 setIcon('');
+                setTaskSets(['homeowner']);
             }
             setError(null);
         }
     }, [visible, taskToEdit]);
+
+    const toggleTaskSet = (set: TaskSet) => {
+        setTaskSets(prev => {
+            if (prev.includes(set)) {
+                // Don't allow removing all sets
+                if (prev.length === 1) return prev;
+                return prev.filter(s => s !== set);
+            } else {
+                return [...prev, set];
+            }
+        });
+    };
 
     const handleSave = async () => {
         if (!name.trim()) {
@@ -66,6 +81,7 @@ export function ManageCoreTaskModal({
                 room: room.trim() || null,
                 estimated_time: estimatedTime ? parseInt(estimatedTime, 10) : null,
                 icon: icon.trim() || null,
+                task_set: taskSets,
             };
 
             if (taskToEdit) {
@@ -176,14 +192,14 @@ export function ManageCoreTaskModal({
                                                 key={freq}
                                                 onPress={() => setFrequency(freq)}
                                                 className={`px-4 py-2 rounded-full border ${frequency === freq
-                                                        ? 'bg-primary dark:bg-primary border-primary'
-                                                        : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                                                    ? 'bg-primary dark:bg-primary border-primary'
+                                                    : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
                                                     }`}
                                             >
                                                 <Text
                                                     className={`font-medium ${frequency === freq
-                                                            ? 'text-[#131811] dark:text-[#131811]'
-                                                            : 'text-gray-600 dark:text-gray-300'
+                                                        ? 'text-[#131811] dark:text-[#131811]'
+                                                        : 'text-gray-600 dark:text-gray-300'
                                                         }`}
                                                 >
                                                     {frequencyLabels[freq]}
@@ -233,6 +249,55 @@ export function ManageCoreTaskModal({
                                 <Text className="text-xs text-gray-400 mt-2">
                                     Use 'mci:' prefix for MaterialCommunityIcons (e.g. mci:broom)
                                 </Text>
+                            </Box>
+
+                            {/* Task Sets */}
+                            <Box>
+                                <Text className="text-sm font-bold text-gray-500 dark:text-gray-400 mb-2 uppercase tracking-wider">Task Sets</Text>
+                                <Text className="text-xs text-gray-400 mb-3">
+                                    Select which onboarding sets should include this task
+                                </Text>
+                                <HStack className="space-x-3">
+                                    <Pressable
+                                        onPress={() => toggleTaskSet('apartment')}
+                                        className={`flex-1 p-4 rounded-xl border flex-row items-center justify-center ${taskSets.includes('apartment')
+                                                ? 'bg-green-50 dark:bg-green-900/20 border-green-300 dark:border-green-700'
+                                                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                                            }`}
+                                    >
+                                        <MaterialIcons
+                                            name="business"
+                                            size={20}
+                                            color={taskSets.includes('apartment') ? '#22c55e' : '#9ca3af'}
+                                        />
+                                        <Text className={`ml-2 font-medium ${taskSets.includes('apartment')
+                                                ? 'text-green-700 dark:text-green-400'
+                                                : 'text-gray-600 dark:text-gray-400'
+                                            }`}>
+                                            Apartment
+                                        </Text>
+                                    </Pressable>
+
+                                    <Pressable
+                                        onPress={() => toggleTaskSet('homeowner')}
+                                        className={`flex-1 p-4 rounded-xl border flex-row items-center justify-center ${taskSets.includes('homeowner')
+                                                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700'
+                                                : 'bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700'
+                                            }`}
+                                    >
+                                        <MaterialIcons
+                                            name="home"
+                                            size={20}
+                                            color={taskSets.includes('homeowner') ? '#3b82f6' : '#9ca3af'}
+                                        />
+                                        <Text className={`ml-2 font-medium ${taskSets.includes('homeowner')
+                                                ? 'text-blue-700 dark:text-blue-400'
+                                                : 'text-gray-600 dark:text-gray-400'
+                                            }`}>
+                                            Homeowner
+                                        </Text>
+                                    </Pressable>
+                                </HStack>
                             </Box>
 
                             {/* Actions */}

@@ -16,6 +16,11 @@ export type Frequency =
   | 'semi_annual'
   | 'annual';
 
+/**
+ * Task set types for onboarding selection
+ */
+export type TaskSet = 'apartment' | 'homeowner';
+
 export interface CoreTask {
   id: string;
   name: string;
@@ -24,6 +29,7 @@ export interface CoreTask {
   icon?: string;
   room?: string;
   estimated_time?: number; // minutes
+  task_set?: TaskSet[]; // which sets this task belongs to
 }
 
 /**
@@ -69,6 +75,8 @@ export interface UserProfile {
   id: string;
   user_id: string;
   initialized: boolean;
+  tutorial_completed: boolean;
+  selected_task_set?: TaskSet | null;
   first_name?: string;
   last_name?: string;
   created_at: string;

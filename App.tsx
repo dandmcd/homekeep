@@ -9,6 +9,7 @@ import HomeScreen from './screens/HomeScreen';
 import AboutScreen from './screens/AboutScreen';
 import SettingsScreen from './screens/SettingsScreen';
 import LoginScreen from './screens/LoginScreen';
+import OnboardingScreen from './screens/OnboardingScreen';
 import CoreTasksScreen from './screens/CoreTasksScreen';
 import CalendarScreen from './screens/CalendarScreen';
 
@@ -20,6 +21,7 @@ import '@/global.css';
 
 export type RootStackParamList = {
   Login: undefined;
+  Onboarding: undefined;
   Home: undefined;
   About: undefined;
   Settings: { inviteCode?: string };
@@ -47,9 +49,9 @@ const linking: LinkingOptions<RootStackParamList> = {
 
 
 function Navigation() {
-  const { session, loading } = useAuth();
+  const { session, loading, tutorialCompleted, initializingTasks } = useAuth();
 
-  if (loading) {
+  if (loading || initializingTasks) {
     return (
       <Center className="flex-1">
         <Spinner size="lg" />
@@ -69,8 +71,22 @@ function Navigation() {
         },
       }}
     >
-      {session ? (
-        // Authenticated screens
+      {!session ? (
+        // Unauthenticated screens
+        <Stack.Screen
+          name="Login"
+          component={LoginScreen}
+          options={{ headerShown: false }}
+        />
+      ) : !tutorialCompleted ? (
+        // Onboarding for users who haven't completed tutorial
+        <Stack.Screen
+          name="Onboarding"
+          component={OnboardingScreen}
+          options={{ headerShown: false }}
+        />
+      ) : (
+        // Authenticated screens (tutorial completed)
         <>
           <Stack.Screen
             name="Home"
@@ -98,13 +114,6 @@ function Navigation() {
             options={{ title: 'Schedule' }}
           />
         </>
-      ) : (
-        // Unauthenticated screens
-        <Stack.Screen
-          name="Login"
-          component={LoginScreen}
-          options={{ headerShown: false }}
-        />
       )}
     </Stack.Navigator>
   );

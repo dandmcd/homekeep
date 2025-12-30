@@ -8,7 +8,7 @@ import React, {
 import { Session, User } from "@supabase/supabase-js";
 import { supabase } from "../lib/supabase";
 import { generateTaskEventsForUser } from "../lib/scheduling";
-import { UserTask, CoreTask, Frequency, UserProfile, Household, HouseholdMember, HouseholdMemberProfile } from "../lib/database.types";
+import { UserTask, CoreTask, Frequency, UserProfile, Household, HouseholdMember, HouseholdMemberProfile, TaskSet } from "../lib/database.types";
 import * as WebBrowser from "expo-web-browser";
 import * as AuthSession from "expo-auth-session";
 import { makeRedirectUri } from "expo-auth-session";
@@ -21,6 +21,7 @@ interface AuthContextType {
     user: User | null;
     loading: boolean;
     isInitialized: boolean;
+    tutorialCompleted: boolean;
     initializingTasks: boolean;
     userProfile: UserProfile | null;
     isAdmin: boolean;
@@ -30,6 +31,7 @@ interface AuthContextType {
     signUpWithEmail: (email: string, password: string) => Promise<void>;
     signOut: () => Promise<void>;
     resetAccount: () => Promise<void>;
+    initializeWithTaskSet: (taskSet: TaskSet | 'empty') => Promise<void>;
     household: Household | null;
     createHousehold: (name: string) => Promise<void>;
     joinHousehold: (code: string) => Promise<void>;
@@ -45,6 +47,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
     const [loading, setLoading] = useState(true);
     const [isInitialized, setIsInitialized] = useState(false);
+    const [tutorialCompleted, setTutorialCompleted] = useState(false);
     const [initializingTasks, setInitializingTasks] = useState(false);
     const [household, setHousehold] = useState<Household | null>(null);
     const [householdMembers, setHouseholdMembers] = useState<HouseholdMemberProfile[]>([]);
@@ -164,6 +167,136 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setIsInitialized(true);
     }, []);
 
+    // Initialize user with selected task set (called from onboarding screen)
+    const initializeWithTaskSet = useCallback(async (taskSet: TaskSet | 'empty'): Promise<void> => {
+        if (!user) return;
+
+        const userId = user.id;
+        setInitializingTasks(true);
+
+        try {
+            // Try to extract name from metadata
+            const metadata = user.user_metadata || {};
+            const fullName = metadata.full_name || metadata.name || '';
+            const nameParts = fullName.split(' ');
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.slice(1).join(' ') || '';
+
+            // First, create or update user profile
+            const { data: profile, error: profileError } = await supabase
+                .from('user_profiles')
+                .upsert(
+                    {
+                        user_id: userId,
+                        initialized: false,
+                        tutorial_completed: false,
+                        selected_task_set: taskSet === 'empty' ? null : taskSet,
+                        first_name: firstName,
+                        last_name: lastName,
+                        updated_at: new Date().toISOString(),
+                    },
+                    {
+                        onConflict: 'user_id',
+                    }
+                )
+                .select()
+                .single();
+
+            if (profileError) {
+                console.error('Error creating user profile:', profileError);
+                throw profileError;
+            }
+
+            // If not 'empty', create tasks from the selected set
+            if (taskSet !== 'empty') {
+                // Get core tasks for the selected set
+                const { data: coreTasks, error: coreTasksError } = await supabase
+                    .from('core_tasks')
+                    .select('id, frequency, task_set')
+                    .contains('task_set', [taskSet]);
+
+                if (coreTasksError) {
+                    console.error('Error fetching core tasks:', coreTasksError);
+                    throw coreTasksError;
+                }
+
+                if (coreTasks && coreTasks.length > 0) {
+                    // Insert user tasks for each core task
+                    const userTasksData = coreTasks.map((task) => ({
+                        user_id: userId,
+                        core_task_id: task.id,
+                    }));
+
+                    const { data: insertedTasks, error: insertError } = await supabase
+                        .from('user_tasks')
+                        .insert(userTasksData)
+                        .select();
+
+                    if (insertError) {
+                        console.error('Error inserting user tasks:', insertError);
+                        throw insertError;
+                    }
+
+                    // Generate task events
+                    if (insertedTasks) {
+                        const taskMap = new Map(coreTasks.map(ct => [ct.id, ct.frequency as Frequency]));
+                        const fullTasks: UserTask[] = insertedTasks.map(t => ({
+                            id: t.id,
+                            user_id: t.user_id,
+                            core_task_id: t.core_task_id,
+                            created_at: t.created_at,
+                            core_task: {
+                                id: t.core_task_id,
+                                frequency: taskMap.get(t.core_task_id!) as Frequency,
+                            } as CoreTask
+                        }));
+
+                        const events = generateTaskEventsForUser(fullTasks);
+
+                        if (events.length > 0) {
+                            const { error: eventError } = await supabase
+                                .from('task_events')
+                                .insert(events);
+
+                            if (eventError) {
+                                console.error('Error inserting task events:', eventError);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Mark user as initialized and tutorial completed
+            const { data: updatedProfile, error: updateError } = await supabase
+                .from('user_profiles')
+                .update({
+                    initialized: true,
+                    tutorial_completed: true,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('user_id', userId)
+                .select()
+                .single();
+
+            if (updateError) {
+                console.error('Error updating user profile:', updateError);
+                throw updateError;
+            }
+
+            if (updatedProfile) {
+                setUserProfile(updatedProfile);
+            }
+
+            setIsInitialized(true);
+            setTutorialCompleted(true);
+        } catch (err) {
+            console.error('Error in initializeWithTaskSet:', err);
+            throw err;
+        } finally {
+            setInitializingTasks(false);
+        }
+    }, [user]);
+
     // Reset account - delete all user tasks and mark as not initialized
     const resetAccount = useCallback(async (): Promise<void> => {
         if (!user) return;
@@ -171,7 +304,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         try {
             setInitializingTasks(true);
 
-            // Hard delete all user tasks
+            // Hard delete all user tasks (cascade should delete task_events)
             const { error: deleteError } = await supabase
                 .from('user_tasks')
                 .delete()
@@ -182,30 +315,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 throw deleteError;
             }
 
-            // Mark user as not initialized
-            const { error: updateError } = await supabase
+            // Mark user as not initialized and reset tutorial
+            const { data: updatedProfile, error: updateError } = await supabase
                 .from('user_profiles')
-                .update({ initialized: false, updated_at: new Date().toISOString() })
-                .eq('user_id', user.id);
+                .update({
+                    initialized: false,
+                    tutorial_completed: false,
+                    selected_task_set: null,
+                    updated_at: new Date().toISOString(),
+                })
+                .eq('user_id', user.id)
+                .select()
+                .single();
 
             if (updateError) {
                 console.error('Error updating user profile:', updateError);
                 throw updateError;
             }
 
-            setIsInitialized(false);
+            if (updatedProfile) {
+                setUserProfile(updatedProfile);
+            }
 
-            // Re-initialize with fresh core tasks
-            await initializeUserTasks(user);
+            setIsInitialized(false);
+            setTutorialCompleted(false);
+            // Don't re-initialize - let user go through onboarding again
         } catch (err) {
             console.error('Error in resetAccount:', err);
             throw err;
         } finally {
             setInitializingTasks(false);
         }
-    }, [user, initializeUserTasks]);
+    }, [user]);
 
-    // Handle user initialization check and auto-initialize
+    // Handle user initialization check - NO auto-initialize, wait for onboarding
     const handleUserInit = useCallback(async (currentUser: User): Promise<void> => {
         const userId = currentUser.id;
         console.log('handleUserInit started for:', userId);
@@ -213,36 +356,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             .from('user_profiles')
             .select('*')
             .eq('user_id', userId)
-            .single();
+            .maybeSingle();
 
-        if (error && error.code !== 'PGRST116') {
+        if (error) {
             console.error('Error checking user profile:', error);
             throw error;
         }
 
         const initialized = data?.initialized ?? false;
+        const tutorialDone = data?.tutorial_completed ?? false;
+
         setIsInitialized(initialized);
+        setTutorialCompleted(tutorialDone);
 
         if (data) {
             setUserProfile(data);
-        }
-
-        if (!initialized) {
-            console.log('User not initialized, starting initializeUserTasks...');
-            await initializeUserTasks(currentUser);
-            console.log('initializeUserTasks completed');
         } else {
-            console.log('User already initialized in database, skipping task creation');
+            // Create a minimal profile for new users (they'll complete it in onboarding)
+            console.log('No profile found, creating minimal profile for onboarding...');
+            const metadata = currentUser.user_metadata || {};
+            const fullName = metadata.full_name || metadata.name || '';
+            const nameParts = fullName.split(' ');
+            const firstName = nameParts[0] || '';
+            const lastName = nameParts.slice(1).join(' ') || '';
+
+            const { data: newProfile, error: createError } = await supabase
+                .from('user_profiles')
+                .insert({
+                    user_id: userId,
+                    initialized: false,
+                    tutorial_completed: false,
+                    first_name: firstName,
+                    last_name: lastName,
+                })
+                .select()
+                .single();
+
+            if (createError) {
+                console.error('Error creating user profile:', createError);
+                // Don't throw - let them proceed to onboarding anyway
+            } else if (newProfile) {
+                setUserProfile(newProfile);
+            }
         }
 
-        console.log('handleUserInit finished');
+        console.log('handleUserInit finished, tutorialCompleted:', tutorialDone);
 
         // Fetch Household
         const { data: memberData, error: memberError } = await supabase
             .from('household_members')
             .select('*, household:households(*)')
             .eq('user_id', userId)
-            .maybeSingle(); // Use maybeSingle as user might not be in a household
+            .maybeSingle();
 
         if (memberError) {
             console.error('Error fetching household member data:', memberError);
@@ -255,7 +420,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const { data: members } = await supabase
                 .from('household_members')
                 .select('*, profile:user_profiles(*)')
-                .eq('household_id', memberData.household.id);
+                .eq('household_id', (memberData.household as Household).id);
 
             if (members) {
                 setHouseholdMembers(members as unknown as HouseholdMemberProfile[]);
@@ -264,7 +429,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             setHousehold(null);
             setHouseholdMembers([]);
         }
-    }, [initializeUserTasks]);
+    }, []);
 
     const createHousehold = useCallback(async (name: string): Promise<void> => {
         if (!user) return;
@@ -543,12 +708,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         updateProfile,
         loading,
         isInitialized,
+        tutorialCompleted,
         initializingTasks,
         signInWithGoogle,
         signInWithEmail,
         signUpWithEmail,
         signOut,
         resetAccount,
+        initializeWithTaskSet,
         household,
         householdMembers,
         createHousehold,
