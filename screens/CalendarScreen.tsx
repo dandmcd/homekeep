@@ -42,6 +42,8 @@ interface TaskEventItem {
     room?: string;
     estimated_time?: number;
     icon?: string;
+    assigned_to?: string;
+    household_id?: string;
 }
 
 // Group tasks by date
@@ -50,7 +52,7 @@ interface GroupedTasks {
 }
 
 export default function CalendarScreen({ navigation }: CalendarScreenProps) {
-    const { user, userProfile } = useAuth();
+    const { user, userProfile, household, householdMembers } = useAuth();
     const [tasks, setTasks] = useState<TaskEventItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [viewMode, setViewMode] = useState<'week' | 'month'>('week');
@@ -96,7 +98,8 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
                     name,
                     frequency,
                     room,
-                    estimated_time,
+                    assigned_to,
+                    household_id,
                     core_task:core_tasks (
                       name,
                       frequency,
@@ -122,6 +125,8 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
                 room: event.user_task?.room || event.user_task?.core_task?.room,
                 estimated_time: event.user_task?.estimated_time || event.user_task?.core_task?.estimated_time,
                 icon: event.user_task?.core_task?.icon,
+                assigned_to: event.user_task?.assigned_to,
+                household_id: event.user_task?.household_id,
             }));
 
             // Merge with existing tasks, avoiding duplicates
@@ -418,11 +423,23 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
                                                         <View className="flex-1 mr-2">
                                                             <Text className="text-text-main dark:text-white font-bold text-sm" numberOfLines={1}>{task.name}</Text>
                                                             <Text className="text-text-muted dark:text-gray-500 text-xs font-medium">
+                                                                {task.household_id && <MaterialIcons name="home" size={12} color="#3b82f6" style={{ marginRight: 4 }} />}
                                                                 {task.room ? `${task.room} • ` : ''}
                                                                 {task.frequency ? frequencyLabels[task.frequency as Frequency] : 'One-time'}
                                                                 {task.estimated_time ? ` • ${task.estimated_time} min` : ''}
                                                             </Text>
                                                         </View>
+
+                                                        {/* Assignee Avatar */}
+                                                        {task.assigned_to && householdMembers.find(m => m.user_id === task.assigned_to) && (
+                                                            <View className="mr-3">
+                                                                <UserAvatar
+                                                                    className="w-8 h-8 rounded-full border-2 border-white dark:border-gray-800"
+                                                                    textClassName="text-xs"
+                                                                    name={householdMembers.find(m => m.user_id === task.assigned_to)?.profile?.first_name}
+                                                                />
+                                                            </View>
+                                                        )}
                                                     </Pressable>
 
                                                     <View className="w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-800 items-center justify-center">
@@ -479,8 +496,13 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
                     taskDetails={{
                         frequency: activeTask.frequency,
                         room: activeTask.room,
-                        dueDate: activeTask.due_date
+                        dueDate: activeTask.due_date,
+                        assignedTo: activeTask.assigned_to,
+                        householdId: activeTask.household_id,
+                        id: activeTask.id
                     }}
+                    household={household}
+                    members={householdMembers}
                 />
             )}
         </View>

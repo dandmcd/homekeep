@@ -404,7 +404,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             <View className="relative h-3 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
               <View
                 className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all duration-500"
-                style={{ width: `${getDailyProgress().percent}% ` }}
+                style={{ width: `${getDailyProgress().percent}%` }}
               />
             </View>
           </Card>
@@ -499,14 +499,26 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                           {getTaskIcon(iconName, 16, "#555")}
                         </View>
 
-                        <View className="flex-1">
+                        <View className="flex-1 mr-2">
                           <Text className="text-base font-medium dark:text-white" numberOfLines={1}>{task.name || task.core_task?.name || 'Task'}</Text>
                           <Text className="text-xs text-gray-500">
+                            {task.household_id && <MaterialIcons name="home" size={12} color="#3b82f6" style={{ marginRight: 4 }} />}
                             {task.room ? `${task.room} • ` : ''}
                             {task.frequency ? frequencyLabels[task.frequency] : 'Daily'}
                             {task.estimated_time ? ` • ${task.estimated_time} min` : ''}
                           </Text>
                         </View>
+
+                        {/* Assignee Avatar */}
+                        {task.assigned_to && householdMembers.find(m => m.user_id === task.assigned_to) && (
+                          <View className="mr-3">
+                            <UserAvatar
+                              className="w-8 h-8 rounded-full border-2 border-white dark:border-gray-800"
+                              textClassName="text-xs"
+                              name={householdMembers.find(m => m.user_id === task.assigned_to)?.profile?.first_name}
+                            />
+                          </View>
+                        )}
 
                         <View className="w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-800 items-center justify-center">
                           {task.estimated_time ? (
@@ -582,11 +594,10 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           taskDetails={{
             frequency: activeTask.frequency || activeTask.core_task?.frequency,
             room: activeTask.room || activeTask.core_task?.room,
-            frequency: activeTask.frequency || activeTask.core_task?.frequency,
-            room: activeTask.room || activeTask.core_task?.room,
             dueDate: pendingTaskMap.get(activeTask.id),
             assignedTo: activeTask.assigned_to,
-            householdId: activeTask.household_id
+            householdId: activeTask.household_id,
+            id: activeTask.id
           }}
           household={household}
           members={householdMembers}

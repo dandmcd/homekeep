@@ -33,6 +33,8 @@ interface TaskDetailsModalProps {
     taskName: string;
     durationMinutes: number;
     taskDetails?: TaskDetails;
+    household?: Household | null;
+    members?: HouseholdMemberProfile[];
 }
 
 
@@ -56,12 +58,14 @@ export function TaskDetailsModal({ isVisible, onClose, onComplete, taskName, dur
         setIsShared(value);
 
         try {
-            await supabase
+            const { error } = await supabase
                 .from('user_tasks')
                 .update({
                     household_id: value ? household.id : null,
-                    assigned_to: value ? assignedTo : null // Keep assignment if sharing, else clear? Actually if private, assigned_to doesn't make sense usually, or defaults to owner. Let's clear it or keep it as owner (me). For safety, clear it.
+                    assigned_to: value ? assignedTo : null
                 }).eq('id', taskDetails.id);
+
+            if (error) throw error;
         } catch (e) {
             console.error(e);
             setIsShared(!value); // revert
@@ -73,10 +77,12 @@ export function TaskDetailsModal({ isVisible, onClose, onComplete, taskName, dur
         setAssignedTo(userId);
 
         try {
-            await supabase
+            const { error } = await supabase
                 .from('user_tasks')
                 .update({ assigned_to: userId })
                 .eq('id', taskDetails.id);
+
+            if (error) throw error;
         } catch (e) {
             console.error(e);
         }
@@ -325,6 +331,7 @@ export function TaskDetailsModal({ isVisible, onClose, onComplete, taskName, dur
                                                                     <UserAvatar
                                                                         className="w-6 h-6"
                                                                         textClassName="text-xs"
+                                                                        name={member.profile?.first_name}
                                                                     />
                                                                     <Text className={`text-xs font-medium ${isSelected ? 'text-primary-dark' : 'text-gray-700 dark:text-gray-300'}`}>
                                                                         {member.profile?.first_name || 'User'}
