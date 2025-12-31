@@ -42,8 +42,8 @@ interface TaskEventItem {
     room?: string;
     estimated_time?: number;
     icon?: string;
-    assigned_to?: string;
-    household_id?: string;
+    assigned_to?: string | null;
+    household_id?: string | null;
 }
 
 // Group tasks by date
@@ -212,6 +212,21 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
     const handleStartTimer = (task: TaskEventItem) => {
         setActiveTask(task);
         setIsTimerVisible(true);
+    };
+
+    const handleTaskUpdate = (taskId: string, updates: { household_id?: string | null; assigned_to?: string | null }) => {
+        // Update the local tasks state to keep it in sync with the database
+        // Note: taskId here is the user_task_id from TaskDetailsModal, but our items use event id
+        // We need to update matching items by user_task_id
+        setTasks(prev => prev.map(t =>
+            t.id === taskId || t.user_task_id === taskId
+                ? { ...t, ...updates }
+                : t
+        ));
+        // Also update activeTask if it matches
+        if (activeTask?.id === taskId || activeTask?.user_task_id === taskId) {
+            setActiveTask(prev => prev ? { ...prev, ...updates } : null);
+        }
     };
 
     // Helper to render the correct icon family
@@ -499,10 +514,11 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
                         dueDate: activeTask.due_date,
                         assignedTo: activeTask.assigned_to,
                         householdId: activeTask.household_id,
-                        id: activeTask.id
+                        id: activeTask.user_task_id
                     }}
                     household={household}
                     members={householdMembers}
+                    onTaskUpdate={handleTaskUpdate}
                 />
             )}
         </View>

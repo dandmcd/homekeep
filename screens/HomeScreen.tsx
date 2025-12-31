@@ -58,6 +58,9 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   const [activeTask, setActiveTask] = useState<UserTask | null>(null);
   const [isTimerVisible, setIsTimerVisible] = useState(false);
 
+  // Filter State for Today's Tasks
+  const [taskFilter, setTaskFilter] = useState<'all' | 'private' | 'household'>('all');
+
   // Hide default header
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -209,6 +212,13 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     return false;
   };
 
+  const filterTaskByType = (task: UserTask) => {
+    if (taskFilter === 'all') return true;
+    if (taskFilter === 'private') return !task.household_id;
+    if (taskFilter === 'household') return !!task.household_id;
+    return true;
+  };
+
   const getFocusTasks = () => {
     // Filter tasks not completed today AND are relevant
     const activeTasks = tasks.filter(t => !completedTaskIds.has(t.id) && isTaskRelevant(t));
@@ -297,6 +307,17 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
         next.delete(task.id);
         return next;
       });
+    }
+  };
+
+  const handleTaskUpdate = (taskId: string, updates: { household_id?: string | null; assigned_to?: string | null }) => {
+    // Update the local tasks state to keep it in sync with the database
+    setTasks(prev => prev.map(t =>
+      t.id === taskId ? { ...t, ...updates } : t
+    ));
+    // Also update activeTask if it's the one being updated
+    if (activeTask?.id === taskId) {
+      setActiveTask(prev => prev ? { ...prev, ...updates } : null);
     }
   };
 
@@ -466,9 +487,37 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
         {/* Morning Routine / Quick Tasks List */}
         <Box className="px-4 mb-8">
-          <Text className="text-lg font-bold text-gray-900 dark:text-white mb-3">Today's Tasks</Text>
+          <HStack className="items-center justify-between mb-3">
+            <Text className="text-lg font-bold text-gray-900 dark:text-white">Today's Tasks</Text>
+
+            {/* Filter Toggle */}
+            {household && (
+              <View className="flex-row bg-surface-light dark:bg-surface-dark rounded-full p-1 border border-gray-100 dark:border-gray-700">
+                <Pressable
+                  onPress={() => setTaskFilter('all')}
+                  className={`px-2.5 py-1 rounded-full ${taskFilter === 'all' ? 'bg-primary' : 'bg-transparent'}`}
+                >
+                  <Text className={`text-xs font-bold ${taskFilter === 'all' ? 'text-[#131811]' : 'text-gray-500 dark:text-gray-400'}`}>All</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setTaskFilter('private')}
+                  className={`px-2.5 py-1 rounded-full flex-row items-center ${taskFilter === 'private' ? 'bg-gray-200 dark:bg-gray-700' : 'bg-transparent'}`}
+                >
+                  <MaterialIcons name="person" size={12} color={taskFilter === 'private' ? '#374151' : '#9ca3af'} style={{ marginRight: 2 }} />
+                  <Text className={`text-xs font-bold ${taskFilter === 'private' ? 'text-gray-700 dark:text-gray-200' : 'text-gray-500 dark:text-gray-400'}`}>Mine</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => setTaskFilter('household')}
+                  className={`px-2.5 py-1 rounded-full flex-row items-center ${taskFilter === 'household' ? 'bg-blue-100 dark:bg-blue-900/30' : 'bg-transparent'}`}
+                >
+                  <MaterialIcons name="home" size={12} color={taskFilter === 'household' ? '#3b82f6' : '#9ca3af'} style={{ marginRight: 2 }} />
+                  <Text className={`text-xs font-bold ${taskFilter === 'household' ? 'text-blue-600 dark:text-blue-400' : 'text-gray-500 dark:text-gray-400'}`}>Shared</Text>
+                </Pressable>
+              </View>
+            )}
+          </HStack>
           <VStack className="space-y-2">
-            {tasks.filter(t => !completedTaskIds.has(t.id) && !activeFocusTaskIds.has(t.id) && isTaskRelevant(t))
+            {tasks.filter(t => !completedTaskIds.has(t.id) && !activeFocusTaskIds.has(t.id) && isTaskRelevant(t) && filterTaskByType(t))
               .map((task) => {
                 const iconName = task.core_task?.icon;
                 return (
@@ -534,7 +583,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
               })}
 
             {/* Completed Tasks (Collapsible-ish, just list them checked for now) */}
-            {tasks.filter(t => completedTaskIds.has(t.id)).slice(0, 5).map((task) => (
+            {tasks.filter(t => completedTaskIds.has(t.id) && filterTaskByType(t)).slice(0, 5).map((task) => (
               <View key={task.id} className="flex-row items-center p-3 bg-surface-light/50 dark:bg-surface-dark/50 rounded-xl border border-gray-100 dark:border-gray-800/50">
                 <View className="w-6 h-6 rounded-full bg-primary mr-4 items-center justify-center">
                   <MaterialIcons name="check" size={14} color="#131811" style={{ fontWeight: 'bold' }} />
@@ -548,8 +597,12 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
               </View>
             ))}
 
-            {tasks.length === 0 && (
-              <Text className="text-gray-400 italic text-center py-4">No tasks yet. Add some!</Text>
+            {tasks.filter(t => filterTaskByType(t)).length === 0 && (
+              <Text className="text-gray-400 italic text-center py-4">
+                {taskFilter === 'all' ? 'No tasks yet. Add some!' :
+                  taskFilter === 'private' ? 'No private tasks' :
+                    'No shared household tasks'}
+              </Text>
             )}
           </VStack>
         </Box>
@@ -601,6 +654,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           }}
           household={household}
           members={householdMembers}
+          onTaskUpdate={handleTaskUpdate}
         />
       )
       }

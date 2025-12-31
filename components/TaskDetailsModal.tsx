@@ -35,11 +35,12 @@ interface TaskDetailsModalProps {
     taskDetails?: TaskDetails;
     household?: Household | null;
     members?: HouseholdMemberProfile[];
+    onTaskUpdate?: (taskId: string, updates: { household_id?: string | null; assigned_to?: string | null }) => void;
 }
 
 
 
-export function TaskDetailsModal({ isVisible, onClose, onComplete, taskName, durationMinutes, taskDetails, household, members = [] }: TaskDetailsModalProps) {
+export function TaskDetailsModal({ isVisible, onClose, onComplete, taskName, durationMinutes, taskDetails, household, members = [], onTaskUpdate }: TaskDetailsModalProps) {
     const [timeLeft, setTimeLeft] = useState(durationMinutes * 60);
     const [isActive, setIsActive] = useState(false);
     const [showDetails, setShowDetails] = useState(false);
@@ -57,15 +58,21 @@ export function TaskDetailsModal({ isVisible, onClose, onComplete, taskName, dur
         if (!taskDetails?.id || !household) return;
         setIsShared(value);
 
+        const newHouseholdId = value ? household.id : null;
+        const newAssignedTo = value ? assignedTo : null;
+
         try {
             const { error } = await supabase
                 .from('user_tasks')
                 .update({
-                    household_id: value ? household.id : null,
-                    assigned_to: value ? assignedTo : null
+                    household_id: newHouseholdId,
+                    assigned_to: newAssignedTo
                 }).eq('id', taskDetails.id);
 
             if (error) throw error;
+
+            // Notify parent to update local state
+            onTaskUpdate?.(taskDetails.id, { household_id: newHouseholdId, assigned_to: newAssignedTo });
         } catch (e) {
             console.error(e);
             setIsShared(!value); // revert
@@ -83,6 +90,9 @@ export function TaskDetailsModal({ isVisible, onClose, onComplete, taskName, dur
                 .eq('id', taskDetails.id);
 
             if (error) throw error;
+
+            // Notify parent to update local state
+            onTaskUpdate?.(taskDetails.id, { assigned_to: userId });
         } catch (e) {
             console.error(e);
         }
