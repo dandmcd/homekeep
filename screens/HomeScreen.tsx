@@ -91,6 +91,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             frequency,
             room,
             estimated_time,
+            preferred_weekday,
             created_at,
             core_task:core_tasks (
               id,
@@ -125,6 +126,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
           frequency: item.frequency || item.core_task?.frequency,
           room: item.room || item.core_task?.room,
           estimated_time: item.estimated_time || item.core_task?.estimated_time,
+          preferred_weekday: item.preferred_weekday,
           created_at: item.created_at,
           core_task: item.core_task,
         }));
@@ -283,7 +285,12 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
       // Schedule the next occurrence for recurring tasks
       const frequency = task.frequency || task.core_task?.frequency;
       if (frequency) {
-        const nextDueDate = calculateNextDueDate(frequency as Frequency);
+        // Pass preferred_weekday for weekly tasks to align to the correct day
+        const nextDueDate = calculateNextDueDate(
+          frequency as Frequency,
+          new Date(),
+          frequency === 'weekly' ? task.preferred_weekday : undefined
+        );
         const { error: nextError } = await supabase
           .from('task_events')
           .insert({
@@ -310,7 +317,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     }
   };
 
-  const handleTaskUpdate = (taskId: string, updates: { household_id?: string | null; assigned_to?: string | null }) => {
+  const handleTaskUpdate = (taskId: string, updates: { household_id?: string | null; assigned_to?: string | null; preferred_weekday?: number }) => {
     // Update the local tasks state to keep it in sync with the database
     setTasks(prev => prev.map(t =>
       t.id === taskId ? { ...t, ...updates } : t
@@ -650,6 +657,7 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             dueDate: pendingTaskMap.get(activeTask.id),
             assignedTo: activeTask.assigned_to,
             householdId: activeTask.household_id,
+            preferredWeekday: activeTask.preferred_weekday,
             id: activeTask.id
           }}
           household={household}

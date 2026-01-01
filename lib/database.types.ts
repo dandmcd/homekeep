@@ -98,9 +98,23 @@ export interface UserTask {
   created_at: string;
   household_id?: string | null;
   assigned_to?: string | null;
+  preferred_weekday?: number; // 0=Sunday, 1=Monday, ..., 6=Saturday
   // Joined data from core_tasks
   core_task?: CoreTask;
 }
+
+/**
+ * Weekday labels for UI display
+ */
+export const WEEKDAY_LABELS = [
+  'Sunday',
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+] as const;
 
 export type TaskEventStatus = 'pending' | 'completed' | 'skipped';
 

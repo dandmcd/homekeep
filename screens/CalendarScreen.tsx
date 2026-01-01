@@ -44,6 +44,7 @@ interface TaskEventItem {
     icon?: string;
     assigned_to?: string | null;
     household_id?: string | null;
+    preferred_weekday?: number;
 }
 
 // Group tasks by date
@@ -100,6 +101,7 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
                     room,
                     assigned_to,
                     household_id,
+                    preferred_weekday,
                     core_task:core_tasks (
                       name,
                       frequency,
@@ -127,6 +129,7 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
                 icon: event.user_task?.core_task?.icon,
                 assigned_to: event.user_task?.assigned_to,
                 household_id: event.user_task?.household_id,
+                preferred_weekday: event.user_task?.preferred_weekday,
             }));
 
             // Merge with existing tasks, avoiding duplicates
@@ -173,7 +176,12 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
 
             // Schedule the next occurrence when completing a recurring task
             if (newStatus === 'completed' && item.frequency) {
-                const nextDueDate = calculateNextDueDate(item.frequency);
+                // Pass preferred_weekday for weekly tasks
+                const nextDueDate = calculateNextDueDate(
+                    item.frequency,
+                    new Date(),
+                    item.frequency === 'weekly' ? item.preferred_weekday : undefined
+                );
                 const { error: nextError } = await supabase
                     .from('task_events')
                     .insert({
@@ -214,7 +222,7 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
         setIsTimerVisible(true);
     };
 
-    const handleTaskUpdate = (taskId: string, updates: { household_id?: string | null; assigned_to?: string | null }) => {
+    const handleTaskUpdate = (taskId: string, updates: { household_id?: string | null; assigned_to?: string | null; preferred_weekday?: number }) => {
         // Update the local tasks state to keep it in sync with the database
         // Note: taskId here is the user_task_id from TaskDetailsModal, but our items use event id
         // We need to update matching items by user_task_id
@@ -514,6 +522,7 @@ export default function CalendarScreen({ navigation }: CalendarScreenProps) {
                         dueDate: activeTask.due_date,
                         assignedTo: activeTask.assigned_to,
                         householdId: activeTask.household_id,
+                        preferredWeekday: activeTask.preferred_weekday,
                         id: activeTask.user_task_id
                     }}
                     household={household}

@@ -7,7 +7,7 @@ import { Pressable } from '@/components/ui/pressable';
 import { MaterialIcons } from '@expo/vector-icons';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, { useAnimatedProps, useSharedValue, withTiming, Easing, useAnimatedStyle, withSpring, FadeIn, FadeOut } from 'react-native-reanimated';
-import { frequencyLabels, Frequency, Household, HouseholdMemberProfile } from '@/lib/database.types';
+import { frequencyLabels, Frequency, Household, HouseholdMemberProfile, WEEKDAY_LABELS } from '@/lib/database.types';
 import { Switch } from 'react-native';
 import { UserAvatar } from '@/components/UserAvatar';
 import { supabase } from '@/lib/supabase';
@@ -24,6 +24,7 @@ export interface TaskDetails {
     id?: string;
     householdId?: string | null;
     assignedTo?: string | null;
+    preferredWeekday?: number;
 }
 
 interface TaskDetailsModalProps {
@@ -35,7 +36,7 @@ interface TaskDetailsModalProps {
     taskDetails?: TaskDetails;
     household?: Household | null;
     members?: HouseholdMemberProfile[];
-    onTaskUpdate?: (taskId: string, updates: { household_id?: string | null; assigned_to?: string | null }) => void;
+    onTaskUpdate?: (taskId: string, updates: { household_id?: string | null; assigned_to?: string | null; preferred_weekday?: number }) => void;
 }
 
 
@@ -49,9 +50,13 @@ export function TaskDetailsModal({ isVisible, onClose, onComplete, taskName, dur
     const [isShared, setIsShared] = useState(!!taskDetails?.householdId);
     const [assignedTo, setAssignedTo] = useState(taskDetails?.assignedTo);
 
+    // Weekday State for weekly tasks
+    const [preferredWeekday, setPreferredWeekday] = useState(taskDetails?.preferredWeekday ?? 0);
+
     useEffect(() => {
         setIsShared(!!taskDetails?.householdId);
         setAssignedTo(taskDetails?.assignedTo);
+        setPreferredWeekday(taskDetails?.preferredWeekday ?? 0);
     }, [taskDetails]);
 
     const handleToggleShare = async (value: boolean) => {
@@ -95,6 +100,26 @@ export function TaskDetailsModal({ isVisible, onClose, onComplete, taskName, dur
             onTaskUpdate?.(taskDetails.id, { assigned_to: userId });
         } catch (e) {
             console.error(e);
+        }
+    };
+
+    const handleWeekdayChange = async (day: number) => {
+        if (!taskDetails?.id) return;
+        setPreferredWeekday(day);
+
+        try {
+            const { error } = await supabase
+                .from('user_tasks')
+                .update({ preferred_weekday: day })
+                .eq('id', taskDetails.id);
+
+            if (error) throw error;
+
+            // Notify parent to update local state
+            onTaskUpdate?.(taskDetails.id, { preferred_weekday: day });
+        } catch (e) {
+            console.error(e);
+            setPreferredWeekday(taskDetails?.preferredWeekday ?? 0); // revert
         }
     };
 
@@ -305,6 +330,34 @@ export function TaskDetailsModal({ isVisible, onClose, onComplete, taskName, dur
                                             <Text className="text-gray-900 dark:text-white font-medium">{taskDetails?.dueDate ? new Date(taskDetails.dueDate).toLocaleDateString() : 'Today'}</Text>
                                         </View>
                                     </View>
+
+                                    {/* Weekday Picker for Weekly Tasks */}
+                                    {taskDetails?.frequency === 'weekly' && (
+                                        <View className="pt-3 border-t border-gray-100 dark:border-gray-800">
+                                            <View className="flex-row items-center space-x-3 mb-3">
+                                                <View className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 items-center justify-center">
+                                                    <MaterialIcons name="today" size={18} color="#a855f7" />
+                                                </View>
+                                                <View>
+                                                    <Text className="text-xs text-gray-500 uppercase font-bold">Preferred Day</Text>
+                                                    <Text className="text-gray-900 dark:text-white font-medium">{WEEKDAY_LABELS[preferredWeekday]}</Text>
+                                                </View>
+                                            </View>
+                                            <View className="flex-row flex-wrap gap-1">
+                                                {WEEKDAY_LABELS.map((dayName, index) => (
+                                                    <Pressable
+                                                        key={dayName}
+                                                        onPress={() => handleWeekdayChange(index)}
+                                                        className={`px-3 py-2 rounded-lg ${preferredWeekday === index ? 'bg-purple-500' : 'bg-gray-100 dark:bg-gray-800'}`}
+                                                    >
+                                                        <Text className={`text-xs font-bold ${preferredWeekday === index ? 'text-white' : 'text-gray-600 dark:text-gray-300'}`}>
+                                                            {dayName.substring(0, 3)}
+                                                        </Text>
+                                                    </Pressable>
+                                                ))}
+                                            </View>
+                                        </View>
+                                    )}
 
                                     {/* Sharing Section */}
                                     {household && (

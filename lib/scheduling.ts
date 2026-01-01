@@ -20,10 +20,35 @@ export const getSeasonStartDate = (season: string, year: number): Date => {
     }
 };
 
+/**
+ * Align a date to a specific day of the week.
+ * If the date is already on the target day, returns the date + 7 days.
+ * Otherwise, finds the next occurrence of the target day.
+ * @param date - The base date to align from
+ * @param targetDay - Target day of week (0=Sunday, 6=Saturday)
+ * @returns Date aligned to the target weekday
+ */
+export const alignToWeekday = (date: Date, targetDay: number): Date => {
+    const result = new Date(date);
+    const currentDay = result.getDay();
+
+    // Calculate days until next target day
+    let daysUntilTarget = targetDay - currentDay;
+
+    // If we're on the target day or it's in the past this week, go to next week
+    if (daysUntilTarget <= 0) {
+        daysUntilTarget += 7;
+    }
+
+    result.setDate(result.getDate() + daysUntilTarget);
+    return result;
+};
+
 export const calculateNextOccurrences = (
     frequency: Frequency,
     startDate: Date = new Date(),
-    months: number = 12
+    months: number = 12,
+    preferredWeekday?: number
 ): Date[] => {
     const dates: Date[] = [];
     const endDate = new Date(startDate);
@@ -44,6 +69,17 @@ export const calculateNextOccurrences = (
         }
 
         current = seasonDate;
+    }
+
+    // For weekly tasks with preferred weekday, align to that day
+    if (frequency === 'weekly' && preferredWeekday !== undefined) {
+        current = alignToWeekday(current, preferredWeekday);
+        // Adjust back if we went past today into next week unnecessarily
+        const checkDate = new Date(current);
+        checkDate.setDate(checkDate.getDate() - 7);
+        if (checkDate >= startDate) {
+            current = checkDate;
+        }
     }
 
     while (current <= endDate) {
@@ -89,10 +125,14 @@ export const calculateNextOccurrences = (
  * Calculate the next due date for a recurring task after it's been completed.
  * Unlike calculateNextOccurrences which generates all future dates,
  * this returns only the NEXT single occurrence.
+ * @param frequency - The task frequency
+ * @param afterDate - The date to calculate from (default: now)
+ * @param preferredWeekday - For weekly tasks, the preferred day (0=Sunday, 6=Saturday)
  */
 export const calculateNextDueDate = (
     frequency: Frequency,
-    afterDate: Date = new Date()
+    afterDate: Date = new Date(),
+    preferredWeekday?: number
 ): Date => {
     const next = new Date(afterDate);
     next.setHours(0, 0, 0, 0);
@@ -102,6 +142,10 @@ export const calculateNextDueDate = (
             next.setDate(next.getDate() + 1);
             break;
         case 'weekly':
+            // If preferred weekday is set, align to that day
+            if (preferredWeekday !== undefined) {
+                return alignToWeekday(next, preferredWeekday);
+            }
             next.setDate(next.getDate() + 7);
             break;
         case 'biweekly':
