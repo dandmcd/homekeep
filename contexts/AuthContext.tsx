@@ -421,19 +421,80 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (memberData && memberData.household) {
             setHousehold(memberData.household as unknown as Household);
 
-            // Fetch all members
-            const { data: members } = await supabase
+            // Fetch all members first
+            const { data: members, error: membersError } = await supabase
                 .from('household_members')
-                .select('*, profile:user_profiles(*)')
+                .select('*')
                 .eq('household_id', (memberData.household as Household).id);
 
-            if (members) {
-                setHouseholdMembers(members as unknown as HouseholdMemberProfile[]);
+            if (membersError) {
+                console.error('Error fetching household members:', membersError);
+            } else if (members && members.length > 0) {
+                // Fetch profiles for all member user_ids
+                const userIds = members.map(m => m.user_id);
+                const { data: profiles, error: profilesError } = await supabase
+                    .from('user_profiles')
+                    .select('user_id, first_name, last_name')
+                    .in('user_id', userIds);
+
+                if (profilesError) {
+                    console.error('Error fetching member profiles:', profilesError);
+                }
+
+                // Combine members with their profiles
+                const profileMap = new Map((profiles || []).map(p => [p.user_id, p]));
+                const membersWithProfiles = members.map(member => ({
+                    ...member,
+                    profile: profileMap.get(member.user_id) || null
+                })) as unknown as HouseholdMemberProfile[];
+
+                setHouseholdMembers(membersWithProfiles);
+            } else {
+                setHouseholdMembers([]);
             }
         } else {
             setHousehold(null);
             setHouseholdMembers([]);
         }
+    }, []);
+
+    // Helper to fetch household members with their profiles
+    const fetchHouseholdMembers = useCallback(async (householdId: string): Promise<void> => {
+        // Step 1: Fetch all members
+        const { data: members, error: membersError } = await supabase
+            .from('household_members')
+            .select('*')
+            .eq('household_id', householdId);
+
+        if (membersError) {
+            console.error('Error fetching household members:', membersError);
+            return;
+        }
+
+        if (!members || members.length === 0) {
+            setHouseholdMembers([]);
+            return;
+        }
+
+        // Step 2: Fetch profiles for all member user_ids
+        const userIds = members.map(m => m.user_id);
+        const { data: profiles, error: profilesError } = await supabase
+            .from('user_profiles')
+            .select('user_id, first_name, last_name')
+            .in('user_id', userIds);
+
+        if (profilesError) {
+            console.error('Error fetching member profiles:', profilesError);
+        }
+
+        // Combine members with their profiles
+        const profileMap = new Map((profiles || []).map(p => [p.user_id, p]));
+        const membersWithProfiles = members.map(member => ({
+            ...member,
+            profile: profileMap.get(member.user_id) || null
+        })) as unknown as HouseholdMemberProfile[];
+
+        setHouseholdMembers(membersWithProfiles);
     }, []);
 
     const createHousehold = useCallback(async (name: string): Promise<void> => {
@@ -467,6 +528,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (memberError) throw memberError;
 
             setHousehold(householdData);
+
+            // Fetch members (creator is the only member initially)
+            await fetchHouseholdMembers(householdData.id);
         } catch (error) {
             console.error('Error creating household:', error);
             throw error;
@@ -504,6 +568,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (joinError) throw joinError;
 
             setHousehold(household);
+
+            // Fetch all household members including the new joiner
+            await fetchHouseholdMembers(household.id);
         } catch (error) {
             console.error('Error joining household:', error);
             throw error;
@@ -526,6 +593,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (error) throw error;
 
             setHousehold(null);
+            setHouseholdMembers([]);
         } catch (error) {
             console.error('Error leaving household:', error);
             throw error;
