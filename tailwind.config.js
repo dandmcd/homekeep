@@ -20,7 +20,6 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        "primary": "#5bec13",
         "background-light": "#f6f8f6",
         "background-dark": "#162210",
         "surface-light": "#ffffff",
@@ -28,6 +27,7 @@ module.exports = {
         "text-main": "#131811",
         "text-muted": "#6f8961",
         primary: {
+          DEFAULT: '#5bec13',
           0: 'rgb(var(--color-primary-0)/<alpha-value>)',
           50: 'rgb(var(--color-primary-50)/<alpha-value>)',
           100: 'rgb(var(--color-primary-100)/<alpha-value>)',

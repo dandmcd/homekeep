@@ -61,6 +61,9 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   // Filter State for Today's Tasks
   const [taskFilter, setTaskFilter] = useState<'all' | 'private' | 'household'>('all');
 
+  // Progress bar width (measured via onLayout)
+  const [progressBarWidth, setProgressBarWidth] = useState(0);
+
   // Hide default header
   useLayoutEffect(() => {
     navigation.setOptions({
@@ -242,18 +245,14 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
   };
 
   const getDailyProgress = () => {
-    // Denominator: Tasks Due Today
-    // For now, assume "Daily" tasks + any others due (or roughly total active tasks for the day)
-    // Simplified: Count of Daily Tasks + Completed Tasks (if they weren't daily)
-    // Better: Just use total count of "Focus candidates" + Completed? 
-    // Let's use: All Daily Tasks + Any other task that was completed today.
+    // Count all tasks that are "relevant" for today:
+    // - Daily frequency tasks
+    // - Tasks with pending events due today or overdue
+    const relevantTasks = tasks.filter(t => isTaskRelevant(t));
+    const completedRelevant = relevantTasks.filter(t => completedTaskIds.has(t.id));
 
-    const dailyTasks = tasks.filter(t => t.frequency === 'daily');
-    const completedDaily = dailyTasks.filter(t => completedTaskIds.has(t.id));
-    const otherCompleted = tasks.filter(t => t.frequency !== 'daily' && completedTaskIds.has(t.id));
-
-    const totalDue = dailyTasks.length + otherCompleted.length; // Dynamic denominator
-    const totalDone = completedDaily.length + otherCompleted.length;
+    const totalDue = relevantTasks.length;
+    const totalDone = completedRelevant.length;
 
     return {
       percent: totalDue > 0 ? Math.round((totalDone / totalDue) * 100) : 0,
@@ -429,10 +428,13 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                 </Text>
               </Box>
             </HStack>
-            <View className="relative h-3 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+            <View
+              className="h-3 w-full bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden"
+              onLayout={(e) => setProgressBarWidth(e.nativeEvent.layout.width)}
+            >
               <View
-                className="absolute top-0 left-0 h-full bg-primary rounded-full transition-all duration-500"
-                style={{ width: `${getDailyProgress().percent}%` }}
+                className="h-full bg-primary rounded-full"
+                style={{ width: progressBarWidth * (getDailyProgress().percent / 100) }}
               />
             </View>
           </Card>
