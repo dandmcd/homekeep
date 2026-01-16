@@ -210,3 +210,147 @@ export const generateTaskEventsForUser = (userTasks: UserTask[]): NewTaskEvent[]
 
     return events;
 };
+
+// ============================================
+// Task Threshold System - Priority & Urgency
+// ============================================
+
+/**
+ * Default thresholds for task prioritization (can be overridden by user settings)
+ */
+export const DEFAULT_DAILY_TIME_BUDGET_MINUTES = 75; // Middle of 60-90 range
+export const MIN_DAILY_TIME_BUDGET = 30;
+export const MAX_DAILY_TIME_BUDGET = 180;
+
+/**
+ * Urgency windows: how many days before due date a task escalates to primary list
+ */
+export const URGENCY_WINDOWS: Record<string, number> = {
+    daily: 0,           // Always urgent
+    weekly: 0,          // Always urgent when due
+    biweekly: 3,        // 3 days before
+    monthly: 7,         // 7 days before
+    semi_monthly: 5,    // 5 days before
+    quarterly: 10,      // 10 days before
+    seasonal_spring: 14,
+    seasonal_summer: 14,
+    seasonal_fall: 14,
+    seasonal_winter: 14,
+    semi_annual: 14,
+    annual: 14,
+};
+
+/**
+ * Priority tiers for frequencies (lower = more urgent/higher priority)
+ * Used to determine which tasks get shown first
+ */
+export const FREQUENCY_PRIORITY: Record<Frequency, number> = {
+    daily: 1,
+    weekly: 2,
+    biweekly: 3,
+    semi_monthly: 4,
+    monthly: 5,
+    quarterly: 6,
+    seasonal_spring: 7,
+    seasonal_summer: 7,
+    seasonal_fall: 7,
+    seasonal_winter: 7,
+    semi_annual: 8,
+    annual: 9,
+};
+
+/**
+ * Get numeric priority for a frequency (lower = higher priority)
+ */
+export const getFrequencyPriority = (frequency: Frequency): number => {
+    return FREQUENCY_PRIORITY[frequency] ?? 10;
+};
+
+/**
+ * Get the end date for a given season
+ * Seasons end the day before the next season starts
+ */
+export const getSeasonEndDate = (season: string, year: number): Date => {
+    switch (season) {
+        case 'seasonal_spring':
+            return new Date(year, 5, 20); // June 20 (day before summer)
+        case 'seasonal_summer':
+            return new Date(year, 8, 21); // Sept 21 (day before fall)
+        case 'seasonal_fall':
+            return new Date(year, 11, 20); // Dec 20 (day before winter)
+        case 'seasonal_winter':
+            return new Date(year + 1, 2, 19); // March 19 next year (day before spring)
+        default:
+            // For non-seasonal, return end of year
+            return new Date(year, 11, 31);
+    }
+};
+
+/**
+ * Calculate days until a due date from today
+ * Negative values mean the task is overdue
+ */
+export const getDaysUntilDue = (dueDate: string | Date): number => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const due = typeof dueDate === 'string' ? new Date(dueDate) : new Date(dueDate);
+    due.setHours(0, 0, 0, 0);
+
+    const diffMs = due.getTime() - today.getTime();
+    return Math.floor(diffMs / (1000 * 60 * 60 * 24));
+};
+
+/**
+ * Determine if a task should be in the primary list based on urgency
+ * Returns true if task is urgent enough to show in main "Today's Tasks"
+ */
+export const isTaskUrgent = (
+    frequency: Frequency,
+    dueDate: string | null,
+    customUrgencyWindow?: number
+): boolean => {
+    // No due date means we can't determine urgency - default to not urgent
+    if (!dueDate) return false;
+
+    const daysUntil = getDaysUntilDue(dueDate);
+
+    // Overdue tasks are ALWAYS urgent
+    if (daysUntil < 0) return true;
+
+    // Daily and weekly tasks are always urgent when due
+    if (frequency === 'daily' || frequency === 'weekly') return true;
+
+    // Use custom window or default for this frequency
+    const urgencyWindow = customUrgencyWindow ?? URGENCY_WINDOWS[frequency] ?? 7;
+
+    return daysUntil <= urgencyWindow;
+};
+
+export type TaskUrgencyTier = 'overdue' | 'urgent' | 'primary' | 'get_ahead';
+
+/**
+ * Categorize a task into urgency tiers for display purposes
+ */
+export const getTaskUrgencyTier = (
+    frequency: Frequency,
+    dueDate: string | null
+): TaskUrgencyTier => {
+    if (!dueDate) return 'get_ahead';
+
+    const daysUntil = getDaysUntilDue(dueDate);
+
+    // Overdue
+    if (daysUntil < 0) return 'overdue';
+
+    // Daily/weekly that are due today
+    if ((frequency === 'daily' || frequency === 'weekly') && daysUntil === 0) {
+        return 'primary';
+    }
+
+    // Check if within urgency window
+    const urgencyWindow = URGENCY_WINDOWS[frequency] ?? 7;
+    if (daysUntil <= urgencyWindow) return 'urgent';
+
+    return 'get_ahead';
+};

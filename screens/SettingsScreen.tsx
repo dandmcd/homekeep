@@ -57,6 +57,11 @@ export default function SettingsScreen({ navigation, route }: SettingsScreenProp
   const [joinModalVisible, setJoinModalVisible] = useState(false);
   const [inviteCode, setInviteCode] = useState('');
 
+  // Time Budget Settings
+  const [budgetEnabled, setBudgetEnabled] = useState(userProfile?.budget_enabled !== false);
+  const [timeBudget, setTimeBudget] = useState(userProfile?.daily_time_budget ?? 75);
+  const [isSavingBudget, setIsSavingBudget] = useState(false);
+
   React.useEffect(() => {
     if (route.params?.inviteCode && !household) {
       setInviteCode(route.params.inviteCode);
@@ -92,6 +97,8 @@ export default function SettingsScreen({ navigation, route }: SettingsScreenProp
     if (userProfile) {
       setFirstName(userProfile.first_name || '');
       setLastName(userProfile.last_name || '');
+      setBudgetEnabled(userProfile.budget_enabled !== false);
+      setTimeBudget(userProfile.daily_time_budget ?? 75);
     }
   }, [userProfile]);
 
@@ -344,6 +351,92 @@ export default function SettingsScreen({ navigation, route }: SettingsScreenProp
                   trackColor={{ false: '#e5e7eb', true: '#5bec13' }}
                 />
               </HStack>
+            </Card>
+          </Box>
+
+          {/* Time Budget Settings */}
+          <Box>
+            <Text className="text-sm font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-3 ml-2">Time Budget</Text>
+            <Card>
+              <View className="space-y-4">
+                {/* Budget Toggle */}
+                <HStack className="justify-between items-center">
+                  <View className="flex-1 mr-4">
+                    <Text className="text-base font-medium text-gray-900 dark:text-white">Enable Time Budget</Text>
+                    <Text className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Limit daily tasks to a manageable amount. Overflow goes to "Get Ahead".
+                    </Text>
+                  </View>
+                  <Switch
+                    value={budgetEnabled}
+                    onValueChange={async (value) => {
+                      setBudgetEnabled(value);
+                      setIsSavingBudget(true);
+                      try {
+                        await updateProfile({ budget_enabled: value });
+                      } catch (e) {
+                        console.error('Failed to save budget setting:', e);
+                      } finally {
+                        setIsSavingBudget(false);
+                      }
+                    }}
+                    trackColor={{ false: '#e5e7eb', true: '#5bec13' }}
+                    thumbColor="#fff"
+                  />
+                </HStack>
+
+                {/* Time Slider - only show when budget is enabled */}
+                {budgetEnabled && (
+                  <View className="pt-2">
+                    <HStack className="justify-between items-center mb-3">
+                      <Text className="text-sm font-medium text-gray-700 dark:text-gray-300">Daily Time Budget</Text>
+                      <View className="px-3 py-1 bg-primary/20 rounded-full">
+                        <Text className="text-sm font-bold text-gray-800 dark:text-primary">{timeBudget} min</Text>
+                      </View>
+                    </HStack>
+
+                    {/* Preset buttons */}
+                    <View className="flex-row flex-wrap gap-2 mb-3">
+                      {[30, 45, 60, 75, 90, 120, 150, 180].map((preset) => (
+                        <Pressable
+                          key={preset}
+                          onPress={async () => {
+                            setTimeBudget(preset);
+                            setIsSavingBudget(true);
+                            try {
+                              await updateProfile({ daily_time_budget: preset });
+                            } catch (e) {
+                              console.error('Failed to save time budget:', e);
+                            } finally {
+                              setIsSavingBudget(false);
+                            }
+                          }}
+                          className={`px-3 py-2 rounded-lg ${timeBudget === preset
+                              ? 'bg-primary'
+                              : 'bg-gray-100 dark:bg-gray-800'
+                            }`}
+                        >
+                          <Text className={`text-sm font-medium ${timeBudget === preset
+                              ? 'text-[#131811]'
+                              : 'text-gray-600 dark:text-gray-400'
+                            }`}>{preset}</Text>
+                        </Pressable>
+                      ))}
+                    </View>
+
+                    <Text className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                      Tasks beyond this limit will appear in the "Get Ahead" section. Overdue tasks are sorted first.
+                    </Text>
+                  </View>
+                )}
+
+                {isSavingBudget && (
+                  <HStack className="items-center justify-center py-2">
+                    <Spinner size="sm" color="#5bec13" />
+                    <Text className="text-xs text-gray-500 ml-2">Saving...</Text>
+                  </HStack>
+                )}
+              </View>
             </Card>
           </Box>
 

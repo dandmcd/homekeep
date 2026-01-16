@@ -14,7 +14,15 @@ import { Pressable } from '@/components/ui/pressable';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import { UserTask, frequencyLabels, Frequency, TaskEvent } from '@/lib/database.types';
-import { calculateNextDueDate, formatDate } from '@/lib/scheduling';
+import {
+  calculateNextDueDate,
+  formatDate,
+  getFrequencyPriority,
+  getTaskUrgencyTier,
+  getDaysUntilDue,
+  DEFAULT_DAILY_TIME_BUDGET_MINUTES,
+  TaskUrgencyTier
+} from '@/lib/scheduling';
 import { View } from 'react-native';
 import { MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { UserAvatar } from '@/components/UserAvatar';
@@ -60,6 +68,16 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
 
   // Filter State for Today's Tasks
   const [taskFilter, setTaskFilter] = useState<'all' | 'private' | 'household'>('all');
+
+  // Get Ahead section collapsed state
+  const [isGetAheadCollapsed, setIsGetAheadCollapsed] = useState(true);
+
+  // User's daily time budget from profile settings
+  // If budget_enabled is false, use a very large number to effectively disable budget
+  const budgetEnabled = userProfile?.budget_enabled !== false;
+  const dailyTimeBudget = budgetEnabled
+    ? (userProfile?.daily_time_budget ?? DEFAULT_DAILY_TIME_BUDGET_MINUTES)
+    : 999999; // Effectively unlimited when disabled
 
   // Progress bar width (measured via onLayout)
   const [progressBarWidth, setProgressBarWidth] = useState(0);
@@ -200,10 +218,29 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     Alert.alert('Not implemented', `Delete ${taskName} functionality coming soon in this UI.`);
   };
 
-  const isTaskRelevant = (task: UserTask) => {
-    // 1. If it's completed today, it's NOT relevant for the "To Do" list (but handled by getFocusTasks filtering already)
-    // BUT caller handles completion check usually. Let's assume this checks "should it appear in the potential list"
+  /**
+   * Get the urgency tier for a task based on its frequency and due date.
+   * This powers the tiered display system.
+   */
+  const getTaskTier = (task: UserTask): TaskUrgencyTier => {
+    const frequency = (task.frequency || task.core_task?.frequency) as Frequency;
+    const dueDate = pendingTaskMap.get(task.id) || null;
+    return getTaskUrgencyTier(frequency, dueDate);
+  };
 
+  /**
+   * Check if task should appear in primary list (Today's Tasks + Focus)
+   * Primary list = overdue + urgent + primary tier tasks within time budget
+   */
+  const isTaskPrimary = (task: UserTask): boolean => {
+    const tier = getTaskTier(task);
+    return tier === 'overdue' || tier === 'urgent' || tier === 'primary';
+  };
+
+  /**
+   * Legacy function - now checks if task has any pending event (for progress calculation)
+   */
+  const isTaskRelevant = (task: UserTask) => {
     // Always show Daily tasks
     if (task.frequency === 'daily') return true;
 
@@ -224,24 +261,120 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
     return true;
   };
 
-  const getFocusTasks = () => {
-    // Filter tasks not completed today AND are relevant
-    const activeTasks = tasks.filter(t => !completedTaskIds.has(t.id) && isTaskRelevant(t));
-
-    // Priority Score Logic (Lower is better)
-    // 1. Overdue (Not implemented yet, assumed separate)
-    // 2. Daily Frequency (assumed "due")
-    // 3. Morning Room (Bedroom, Bathroom, Kitchen)
+  /**
+   * Sort all incomplete tasks by priority for budget allocation.
+   * Order: overdue → urgent → primary (by frequency, then time)
+   */
+  const getSortedActiveTasks = () => {
+    const activeTasks = tasks.filter(t => !completedTaskIds.has(t.id));
 
     return activeTasks.sort((a, b) => {
-      // Prioritize Daily
-      const aFreq = a.frequency === 'daily' ? 0 : 1;
-      const bFreq = b.frequency === 'daily' ? 0 : 1;
-      if (aFreq !== bFreq) return aFreq - bFreq;
+      // First: Sort by urgency tier (overdue first, then urgent, then primary, then get_ahead)
+      const tierOrder: Record<TaskUrgencyTier, number> = {
+        overdue: 0,
+        urgent: 1,
+        primary: 2,
+        get_ahead: 3
+      };
+      const aTier = tierOrder[getTaskTier(a)];
+      const bTier = tierOrder[getTaskTier(b)];
+      if (aTier !== bTier) return aTier - bTier;
 
-      // Then Estimated Time (Shortest first)
-      return (a.estimated_time || 999) - (b.estimated_time || 999);
-    }).slice(0, 3);
+      // Second: Sort by frequency priority (daily > weekly > monthly > seasonal)
+      const aFreq = (a.frequency || a.core_task?.frequency) as Frequency;
+      const bFreq = (b.frequency || b.core_task?.frequency) as Frequency;
+      const aFreqPriority = getFrequencyPriority(aFreq);
+      const bFreqPriority = getFrequencyPriority(bFreq);
+      if (aFreqPriority !== bFreqPriority) return aFreqPriority - bFreqPriority;
+
+      // Third: Sort by estimated time (shortest first for quick wins)
+      return (a.estimated_time || 10) - (b.estimated_time || 10);
+    });
+  };
+
+  /**
+   * Split tasks into budgeted (Today's Tasks) and overflow (Get Ahead) based on time budget.
+   * STRICT BUDGET: All tasks (including overdue) count against the budget.
+   * Tasks are sorted by urgency, so overdue tasks fill the budget first.
+   */
+  const getBudgetedTasks = () => {
+    const sorted = getSortedActiveTasks();
+    const budgeted: UserTask[] = [];
+    const overflow: UserTask[] = [];
+    let currentTime = 0;
+    let overdueCount = 0;
+    let overdueInOverflow = 0;
+
+    for (const task of sorted) {
+      const tier = getTaskTier(task);
+      const taskTime = task.estimated_time || 10;
+
+      // Check if this task fits in the budget
+      const fitsInBudget = currentTime + taskTime <= dailyTimeBudget;
+
+      if (fitsInBudget) {
+        budgeted.push(task);
+        currentTime += taskTime;
+        if (tier === 'overdue') overdueCount++;
+      } else {
+        overflow.push(task);
+        if (tier === 'overdue') overdueInOverflow++;
+      }
+    }
+
+    return {
+      budgeted,
+      overflow,
+      totalTime: currentTime,
+      overdueCount,
+      overdueInOverflow  // Tasks that are overdue but didn't fit in budget
+    };
+  };
+
+  /**
+   * Get tasks for "Focus for Today" cards - top 4 from budgeted tasks
+   */
+  const getFocusTasks = () => {
+    const { budgeted } = getBudgetedTasks();
+    return budgeted.slice(0, 4);
+  };
+
+  /**
+   * Get tasks for "Today's Tasks" list - all budgeted tasks (excluding focus ones shown separately)
+   */
+  const getTodaysTasks = () => {
+    const { budgeted } = getBudgetedTasks();
+    return budgeted;
+  };
+
+  /**
+   * Get tasks for the "Get Ahead" section.
+   * Includes: overflow from budget + tasks not yet urgent
+   */
+  const getGetAheadTasks = () => {
+    const { overflow } = getBudgetedTasks();
+    // Sort overflow by due date (earliest first)
+    return overflow.sort((a, b) => {
+      const aDue = pendingTaskMap.get(a.id);
+      const bDue = pendingTaskMap.get(b.id);
+      if (aDue && bDue) return aDue.localeCompare(bDue);
+      if (aDue) return -1;
+      if (bDue) return 1;
+      return 0;
+    });
+  };
+
+  /**
+   * Get current time load info for display
+   */
+  const getTimeLoadInfo = () => {
+    const { totalTime, budgeted, overflow } = getBudgetedTasks();
+    return {
+      totalTime,
+      budgetedCount: budgeted.length,
+      overflowCount: overflow.length,
+      isOverBudget: totalTime > dailyTimeBudget
+    };
   };
 
   const getDailyProgress = () => {
@@ -526,9 +659,14 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
             )}
           </HStack>
           <VStack className="space-y-2">
-            {tasks.filter(t => !completedTaskIds.has(t.id) && !activeFocusTaskIds.has(t.id) && isTaskRelevant(t) && filterTaskByType(t))
+            {getTodaysTasks().filter(t => !activeFocusTaskIds.has(t.id) && filterTaskByType(t))
               .map((task) => {
                 const iconName = task.core_task?.icon;
+                const tier = getTaskTier(task);
+                const isOverdue = tier === 'overdue';
+                const dueDate = pendingTaskMap.get(task.id);
+                const daysOverdue = dueDate ? -getDaysUntilDue(dueDate) : 0;
+
                 return (
                   <Animated.View
                     key={task.id}
@@ -536,7 +674,10 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                     layout={Layout.springify().delay(200)}
                   >
                     <View
-                      className="flex-row items-center p-3 bg-surface-light dark:bg-surface-dark rounded-xl border border-gray-100 dark:border-gray-800 shadow-sm"
+                      className={`flex-row items-center p-3 rounded-xl shadow-sm ${isOverdue
+                        ? 'bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800'
+                        : 'bg-surface-light dark:bg-surface-dark border border-gray-100 dark:border-gray-800'
+                        }`}
                     >
                       {/* Mark Done Circle */}
                       <Pressable
@@ -544,7 +685,8 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                         className="w-10 h-10 items-center justify-center mr-1 -ml-2 active:opacity-50"
                         hitSlop={10}
                       >
-                        <View className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600" />
+                        <View className={`w-6 h-6 rounded-full border-2 ${isOverdue ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'
+                          }`} />
                       </Pressable>
 
                       {/* Task Content - Tapping this opens timer if easy, or toggle done */}
@@ -553,17 +695,30 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                         onPress={() => task.estimated_time ? handleStartTimer(task) : handleMarkDone(task)}
                       >
                         {/* Task Icon */}
-                        <View className="w-8 h-8 rounded-full bg-gray-100 dark:bg-gray-800 items-center justify-center mr-3">
-                          {getTaskIcon(iconName, 16, "#555")}
+                        <View className={`w-8 h-8 rounded-full items-center justify-center mr-3 ${isOverdue ? 'bg-red-100 dark:bg-red-900/30' : 'bg-gray-100 dark:bg-gray-800'
+                          }`}>
+                          {getTaskIcon(iconName, 16, isOverdue ? "#dc2626" : "#555")}
                         </View>
 
                         <View className="flex-1 mr-2">
-                          <Text className="text-base font-medium dark:text-white" numberOfLines={1}>{task.name || task.core_task?.name || 'Task'}</Text>
+                          <HStack className="items-center space-x-2">
+                            <Text className="text-base font-medium dark:text-white flex-shrink" numberOfLines={1}>
+                              {task.name || task.core_task?.name || 'Task'}
+                            </Text>
+                            {isOverdue && (
+                              <View className="px-1.5 py-0.5 bg-red-500 rounded">
+                                <Text className="text-[10px] font-bold text-white">OVERDUE</Text>
+                              </View>
+                            )}
+                          </HStack>
                           <Text className="text-xs text-gray-500">
                             {task.household_id && <MaterialIcons name="home" size={12} color="#3b82f6" style={{ marginRight: 4 }} />}
                             {task.room ? `${task.room} • ` : ''}
                             {task.frequency ? frequencyLabels[task.frequency] : 'Daily'}
                             {task.estimated_time ? ` • ${task.estimated_time} min` : ''}
+                            {isOverdue && daysOverdue > 0 && (
+                              <Text className="text-red-500 font-medium"> • {daysOverdue}d overdue</Text>
+                            )}
                           </Text>
                         </View>
 
@@ -578,11 +733,12 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                           </View>
                         )}
 
-                        <View className="w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-800 items-center justify-center">
+                        <View className={`w-8 h-8 rounded-full items-center justify-center ${isOverdue ? 'bg-red-100 dark:bg-red-900/30' : 'bg-gray-50 dark:bg-gray-800'
+                          }`}>
                           {task.estimated_time ? (
-                            <MaterialIcons name="timer" size={20} color="#9ca3af" />
+                            <MaterialIcons name="timer" size={20} color={isOverdue ? "#dc2626" : "#9ca3af"} />
                           ) : (
-                            <MaterialIcons name="chevron-right" size={20} color="#d1d5db" />
+                            <MaterialIcons name="chevron-right" size={20} color={isOverdue ? "#dc2626" : "#d1d5db"} />
                           )}
                         </View>
                       </Pressable>
@@ -613,8 +769,151 @@ export default function HomeScreen({ navigation }: HomeScreenProps) {
                     'No shared household tasks'}
               </Text>
             )}
+
+            {/* Alert: All budgeted tasks complete but overflow exists */}
+            {getTodaysTasks().filter(t => !completedTaskIds.has(t.id)).length === 0 &&
+              getGetAheadTasks().length > 0 && (
+                <Pressable
+                  onPress={() => setIsGetAheadCollapsed(false)}
+                  className="flex-row items-center p-4 bg-green-50 dark:bg-green-900/20 rounded-xl border border-green-200 dark:border-green-800 mt-2"
+                >
+                  <View className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/30 items-center justify-center mr-3">
+                    <MaterialIcons name="celebration" size={24} color="#16a34a" />
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-base font-bold text-green-800 dark:text-green-200">
+                      All done for today! 🎉
+                    </Text>
+                    <Text className="text-sm text-green-600 dark:text-green-400">
+                      {getGetAheadTasks().length} more tasks waiting in Get Ahead
+                    </Text>
+                  </View>
+                  <MaterialIcons name="arrow-forward" size={20} color="#16a34a" />
+                </Pressable>
+              )}
+
+            {/* Alert: Overdue tasks pushed to Get Ahead due to budget */}
+            {getBudgetedTasks().overdueInOverflow > 0 && (
+              <Pressable
+                onPress={() => setIsGetAheadCollapsed(false)}
+                className="flex-row items-center p-4 bg-amber-50 dark:bg-amber-900/20 rounded-xl border border-amber-200 dark:border-amber-800 mt-2"
+              >
+                <View className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900/30 items-center justify-center mr-3">
+                  <MaterialIcons name="warning" size={24} color="#d97706" />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-base font-bold text-amber-800 dark:text-amber-200">
+                    {getBudgetedTasks().overdueInOverflow} overdue tasks in Get Ahead
+                  </Text>
+                  <Text className="text-sm text-amber-600 dark:text-amber-400">
+                    Budget is full. Tap to view and add more.
+                  </Text>
+                </View>
+                <MaterialIcons name="arrow-forward" size={20} color="#d97706" />
+              </Pressable>
+            )}
           </VStack>
         </Box>
+
+        {/* Get Ahead Section - Tasks that can be done early */}
+        {getGetAheadTasks().length > 0 && (
+          <Box className="px-4 mb-8">
+            <Pressable
+              onPress={() => setIsGetAheadCollapsed(!isGetAheadCollapsed)}
+              className="flex-row items-center justify-between mb-3"
+            >
+              <HStack className="items-center space-x-2">
+                <MaterialIcons name="trending-up" size={20} color="#5bec13" />
+                <Text className="text-lg font-bold text-gray-900 dark:text-white">Get Ahead</Text>
+                <View className="px-2 py-0.5 bg-gray-100 dark:bg-gray-800 rounded-full">
+                  <Text className="text-xs font-medium text-gray-600 dark:text-gray-400">
+                    {getGetAheadTasks().length} tasks
+                  </Text>
+                </View>
+              </HStack>
+              <MaterialIcons
+                name={isGetAheadCollapsed ? "expand-more" : "expand-less"}
+                size={24}
+                color="#9ca3af"
+              />
+            </Pressable>
+
+            {!isGetAheadCollapsed && (
+              <VStack className="space-y-2">
+                {getGetAheadTasks().slice(0, 5).map((task) => {
+                  const iconName = task.core_task?.icon;
+                  const dueDate = pendingTaskMap.get(task.id);
+                  const daysUntil = dueDate ? getDaysUntilDue(dueDate) : null;
+
+                  return (
+                    <Animated.View
+                      key={task.id}
+                      exiting={SlideOutLeft.duration(300)}
+                      layout={Layout.springify().delay(200)}
+                    >
+                      <View
+                        className="flex-row items-center p-3 bg-surface-light/70 dark:bg-surface-dark/70 rounded-xl border border-dashed border-gray-200 dark:border-gray-700"
+                      >
+                        {/* Mark Done Circle */}
+                        <Pressable
+                          onPress={() => handleMarkDone(task)}
+                          className="w-10 h-10 items-center justify-center mr-1 -ml-2 active:opacity-50"
+                          hitSlop={10}
+                        >
+                          <View className="w-6 h-6 rounded-full border-2 border-dashed border-gray-300 dark:border-gray-600" />
+                        </Pressable>
+
+                        {/* Task Content */}
+                        <Pressable
+                          className="flex-1 flex-row items-center"
+                          onPress={() => task.estimated_time ? handleStartTimer(task) : handleMarkDone(task)}
+                        >
+                          {/* Task Icon */}
+                          <View className="w-8 h-8 rounded-full bg-gray-100/50 dark:bg-gray-800/50 items-center justify-center mr-3">
+                            {getTaskIcon(iconName, 16, "#888")}
+                          </View>
+
+                          <View className="flex-1 mr-2">
+                            <Text className="text-base font-medium text-gray-600 dark:text-gray-300" numberOfLines={1}>
+                              {task.name || task.core_task?.name || 'Task'}
+                            </Text>
+                            <HStack className="items-center space-x-1">
+                              <Text className="text-xs text-gray-400">
+                                {task.frequency ? frequencyLabels[task.frequency] : ''}
+                                {task.estimated_time ? ` • ${task.estimated_time} min` : ''}
+                              </Text>
+                              {daysUntil !== null && (
+                                <View className="px-1.5 py-0.5 bg-blue-50 dark:bg-blue-900/20 rounded">
+                                  <Text className="text-xs font-medium text-blue-600 dark:text-blue-400">
+                                    {daysUntil === 0 ? 'Today' :
+                                      daysUntil === 1 ? 'Tomorrow' :
+                                        `${daysUntil} days`}
+                                  </Text>
+                                </View>
+                              )}
+                            </HStack>
+                          </View>
+
+                          <View className="w-8 h-8 rounded-full bg-gray-50 dark:bg-gray-800 items-center justify-center">
+                            <MaterialIcons name="chevron-right" size={20} color="#d1d5db" />
+                          </View>
+                        </Pressable>
+                      </View>
+                    </Animated.View>
+                  );
+                })}
+
+                {getGetAheadTasks().length > 5 && (
+                  <Pressable className="py-2">
+                    <Text className="text-sm font-medium text-primary text-center">
+                      View all {getGetAheadTasks().length} tasks →
+                    </Text>
+                  </Pressable>
+                )}
+              </VStack>
+            )}
+          </Box>
+        )}
 
         {/* Home Health Widget */}
         <Box className="px-4 mb-6">

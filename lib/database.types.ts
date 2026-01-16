@@ -82,6 +82,9 @@ export interface UserProfile {
   created_at: string;
   updated_at: string;
   role?: 'user' | 'admin';
+  // Time budget settings
+  daily_time_budget?: number | null;  // User's custom time budget in minutes (null = use default)
+  budget_enabled?: boolean;  // false = show all due tasks regardless of time
 }
 
 /**

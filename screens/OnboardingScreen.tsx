@@ -84,11 +84,12 @@ function AddonCard({ icon, title, description, checked, onToggle, color }: Addon
 }
 
 export default function OnboardingScreen() {
-    const { initializeWithTaskSet, loading } = useAuth();
-    const [step, setStep] = useState<1 | 2>(1);
+    const { initializeWithTaskSet, updateProfile, loading } = useAuth();
+    const [step, setStep] = useState<1 | 2 | 3>(1);
     const [primarySet, setPrimarySet] = useState<PrimaryTaskSet | null>(null);
     const [addons, setAddons] = useState<AddonTaskSet[]>([]);
     const [isInitializing, setIsInitializing] = useState(false);
+    const [budgetMode, setBudgetMode] = useState<'managed' | 'all'>('managed');
 
     const toggleAddon = (addon: AddonTaskSet) => {
         setAddons(prev =>
@@ -101,12 +102,14 @@ export default function OnboardingScreen() {
     const handleContinue = async () => {
         if (step === 1 && primarySet) {
             if (primarySet === 'empty') {
-                // Skip step 2 for empty selection
-                await finishOnboarding();
+                // Skip step 2 for empty selection, go directly to step 3
+                setStep(3);
             } else {
                 setStep(2);
             }
         } else if (step === 2) {
+            setStep(3);
+        } else if (step === 3) {
             await finishOnboarding();
         }
     };
@@ -116,6 +119,13 @@ export default function OnboardingScreen() {
 
         try {
             setIsInitializing(true);
+
+            // Save budget preference
+            await updateProfile({
+                budget_enabled: budgetMode === 'managed',
+                daily_time_budget: budgetMode === 'managed' ? 75 : null
+            });
+
             if (primarySet === 'empty') {
                 await initializeWithTaskSet('empty');
             } else {
@@ -133,6 +143,13 @@ export default function OnboardingScreen() {
     const handleBack = () => {
         if (step === 2) {
             setStep(1);
+        } else if (step === 3) {
+            // If we came from empty selection, go back to step 1
+            if (primarySet === 'empty') {
+                setStep(1);
+            } else {
+                setStep(2);
+            }
         }
     };
 
@@ -156,12 +173,14 @@ export default function OnboardingScreen() {
                         <Ionicons name="home" size={48} color="#007AFF" />
                     </View>
                     <Heading size="2xl" className="text-typography-900 text-center mt-4">
-                        {step === 1 ? 'Welcome to Homekeep' : 'Optional Add-ons'}
+                        {step === 1 ? 'Welcome to Homekeep' : step === 2 ? 'Optional Add-ons' : 'Daily Planning Mode'}
                     </Heading>
                     <Text className="text-typography-500 text-center mt-2 text-base px-4">
                         {step === 1
                             ? "Your personal home maintenance assistant. Let's get you set up with the right tasks for your living situation."
-                            : 'Do you have any of these? Add specialized maintenance tasks.'}
+                            : step === 2
+                                ? 'Do you have any of these? Add specialized maintenance tasks.'
+                                : 'How would you like to manage your daily tasks?'}
                     </Text>
                 </View>
 
@@ -169,6 +188,7 @@ export default function OnboardingScreen() {
                 <HStack space="sm" className="justify-center mt-6">
                     <View style={[styles.stepDot, step >= 1 && styles.stepDotActive]} />
                     <View style={[styles.stepDot, step >= 2 && styles.stepDotActive]} />
+                    <View style={[styles.stepDot, step >= 3 && styles.stepDotActive]} />
                 </HStack>
 
                 {step === 1 ? (
@@ -205,7 +225,7 @@ export default function OnboardingScreen() {
                             color="#007AFF"
                         />
                     </VStack>
-                ) : (
+                ) : step === 2 ? (
                     /* Step 2: Add-on Task Sets */
                     <VStack space="md" className="w-full px-5 mt-8">
                         <Text className="text-lg font-semibold text-typography-900 mb-2">
@@ -237,6 +257,38 @@ export default function OnboardingScreen() {
                             </Text>
                         </View>
                     </VStack>
+                ) : (
+                    /* Step 3: Time Budget Preference */
+                    <VStack space="md" className="w-full px-5 mt-8">
+                        <Text className="text-lg font-semibold text-typography-900 mb-2">
+                            Choose your daily task management style:
+                        </Text>
+
+                        <TaskSetCard
+                            icon="timer-outline"
+                            title="Managed (Recommended)"
+                            description="Show ~75 minutes of tasks per day. Overflow tasks go to 'Get Ahead' section."
+                            selected={budgetMode === 'managed'}
+                            onSelect={() => setBudgetMode('managed')}
+                            color="#5bec13"
+                        />
+
+                        <TaskSetCard
+                            icon="list-outline"
+                            title="All Due Tasks"
+                            description="Show all tasks that are due today or overdue. Can be overwhelming if you have many tasks."
+                            selected={budgetMode === 'all'}
+                            onSelect={() => setBudgetMode('all')}
+                            color="#007AFF"
+                        />
+
+                        <View style={styles.infoBox}>
+                            <Ionicons name="information-circle-outline" size={20} color="#8E8E93" />
+                            <Text className="text-sm text-typography-500 flex-1 ml-2">
+                                You can change this anytime in Settings → Time Budget.
+                            </Text>
+                        </View>
+                    </VStack>
                 )}
 
                 {step === 1 && (
@@ -252,7 +304,7 @@ export default function OnboardingScreen() {
 
             {/* Bottom Buttons */}
             <View style={styles.bottomBar}>
-                {step === 2 && (
+                {(step === 2 || step === 3) && (
                     <Button
                         size="xl"
                         variant="outline"
@@ -271,7 +323,7 @@ export default function OnboardingScreen() {
                     action="primary"
                     onPress={handleContinue}
                     disabled={(step === 1 && !primarySet) || isInitializing}
-                    className={step === 2 ? "flex-1" : "w-full"}
+                    className={(step === 2 || step === 3) ? "flex-1" : "w-full"}
                     style={[
                         styles.continueButton,
                         (step === 1 && !primarySet) && styles.buttonDisabled,
@@ -281,7 +333,7 @@ export default function OnboardingScreen() {
                         <Spinner size="sm" color="white" />
                     ) : (
                         <ButtonText className="text-lg font-semibold">
-                            {step === 1 ? 'Continue' : 'Get Started'}
+                            {step === 1 ? 'Continue' : step === 2 ? 'Continue' : 'Get Started'}
                         </ButtonText>
                     )}
                 </Button>
