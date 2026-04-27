@@ -10,6 +10,7 @@ import {
   Calendar, Home, Clock, Share2, User
 } from 'lucide-react';
 import { Frequency, frequencyLabels, WEEKDAY_LABELS, Household, HouseholdMemberProfile } from '@/lib/database.types';
+import { calculateNextDueDate } from '@/lib/scheduling';
 
 interface TaskDetails {
   frequency?: Frequency;
@@ -87,6 +88,14 @@ export function TaskDetailsModal({
   const seconds = timeLeft % 60;
   const progress = 1 - timeLeft / totalSeconds;
   const strokeDashoffset = CIRCLE_CIRCUMFERENCE * (1 - progress);
+
+  const nextDueDate = taskDetails.frequency
+    ? calculateNextDueDate(
+        taskDetails.frequency,
+        new Date(),
+        taskDetails.frequency === 'weekly' ? taskDetails.preferredWeekday : undefined
+      )
+    : null;
 
   const handleShareToggle = async (value: boolean) => {
     if (!household) return;
@@ -229,6 +238,17 @@ export function TaskDetailsModal({
                 <div className="flex items-center gap-2 text-text-muted dark:text-gray-400">
                   <Calendar size={14} />
                   <span>Due {new Date(taskDetails.dueDate + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                </div>
+              )}
+              {nextDueDate && (
+                <div className="flex items-center gap-2 text-text-muted dark:text-gray-400">
+                  <Calendar size={14} />
+                  <span>
+                    Next due{' '}
+                    <span className="text-text-main dark:text-white font-medium">
+                      {nextDueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    </span>
+                  </span>
                 </div>
               )}
             </div>

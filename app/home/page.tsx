@@ -19,6 +19,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { FloatingBottomBar } from '@/components/layout/FloatingBottomBar';
 import { TaskDetailsModal } from '@/components/tasks/TaskDetailsModal';
+import { ConfirmCompleteModal } from '@/components/tasks/ConfirmCompleteModal';
 import {
   Bell, Timer, ChevronRight, Check, Flame, TrendingUp,
   ChevronDown, ChevronUp, AlertTriangle, ShieldCheck, User, Home as HomeIcon
@@ -44,6 +45,7 @@ export default function HomePage() {
   const [isTimerVisible, setIsTimerVisible] = useState(false);
   const [taskFilter, setTaskFilter] = useState<'all' | 'private' | 'household'>('all');
   const [isGetAheadCollapsed, setIsGetAheadCollapsed] = useState(true);
+  const [confirmTask, setConfirmTask] = useState<UserTask | null>(null);
 
   const budgetEnabled = userProfile?.budget_enabled !== false;
   const dailyTimeBudget = budgetEnabled
@@ -199,6 +201,15 @@ export default function HomePage() {
     if (activeTask?.id === taskId) setActiveTask(prev => prev ? { ...prev, ...updates } : null);
   };
 
+  const handleCircleClick = (task: UserTask) => {
+    const frequency = task.frequency || task.core_task?.frequency;
+    if (frequency) {
+      setConfirmTask(task);
+    } else {
+      handleMarkDone(task);
+    }
+  };
+
   const hour = new Date().getHours();
   const greeting = hour < 12 ? 'Good Morning' : hour < 18 ? 'Good Afternoon' : 'Good Evening';
   const displayName = userProfile?.first_name || null;
@@ -306,7 +317,7 @@ export default function HomePage() {
                 >Start Timer</button>
               ) : (
                 <button
-                  onClick={() => handleMarkDone(task)}
+                  onClick={() => handleCircleClick(task)}
                   className="w-full py-2.5 rounded-full bg-gray-100 dark:bg-zinc-800 font-bold text-sm text-gray-900 dark:text-white hover:bg-gray-200 active:opacity-80"
                 >Mark Done</button>
               )}
@@ -348,7 +359,7 @@ export default function HomePage() {
                 <motion.div key={task.id} layout exit={{ x: -100, opacity: 0 }} transition={{ duration: 0.25 }}>
                   <div className={`flex items-center p-3 rounded-xl ${isOverdue ? 'bg-red-50 dark:bg-red-900/20 border-2 border-red-200 dark:border-red-800' : 'bg-surface-light dark:bg-surface-dark border border-gray-100 dark:border-gray-800'}`}>
                     <button
-                      onClick={() => handleMarkDone(task)}
+                      onClick={() => handleCircleClick(task)}
                       className="w-10 h-10 flex items-center justify-center -ml-2 mr-1 flex-shrink-0 active:opacity-50"
                     >
                       <span className={`w-6 h-6 rounded-full border-2 block ${isOverdue ? 'border-red-400 dark:border-red-500' : 'border-gray-300 dark:border-gray-600'}`} />
@@ -462,7 +473,7 @@ export default function HomePage() {
                   return (
                     <motion.div key={task.id} layout exit={{ x: -100, opacity: 0 }} transition={{ duration: 0.25 }}>
                       <div className="flex items-center p-3 bg-surface-light/70 dark:bg-surface-dark/70 rounded-xl border border-dashed border-gray-200 dark:border-gray-700">
-                        <button onClick={() => handleMarkDone(task)} className="w-10 h-10 flex items-center justify-center -ml-2 mr-1 flex-shrink-0 active:opacity-50">
+                        <button onClick={() => handleCircleClick(task)} className="w-10 h-10 flex items-center justify-center -ml-2 mr-1 flex-shrink-0 active:opacity-50">
                           <span className="w-6 h-6 rounded-full border-2 border-dashed border-gray-300 dark:border-gray-600 block" />
                         </button>
                         <button
@@ -540,6 +551,19 @@ export default function HomePage() {
           household={household}
           members={householdMembers}
           onTaskUpdate={handleTaskUpdate}
+        />
+      )}
+
+      {confirmTask && (
+        <ConfirmCompleteModal
+          isVisible={!!confirmTask}
+          taskName={confirmTask.name || confirmTask.core_task?.name || 'Task'}
+          frequency={(confirmTask.frequency || confirmTask.core_task?.frequency) as Frequency}
+          preferredWeekday={confirmTask.preferred_weekday}
+          currentDueDate={pendingTaskMap.get(confirmTask.id)}
+          room={confirmTask.room || confirmTask.core_task?.room}
+          onConfirm={() => { handleMarkDone(confirmTask); setConfirmTask(null); }}
+          onCancel={() => setConfirmTask(null)}
         />
       )}
     </div>
