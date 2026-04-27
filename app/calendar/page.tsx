@@ -8,6 +8,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { UserAvatar } from '@/components/ui/UserAvatar';
 import { FloatingBottomBar } from '@/components/layout/FloatingBottomBar';
 import { TaskDetailsModal } from '@/components/tasks/TaskDetailsModal';
+import { ConfirmCompleteModal } from '@/components/tasks/ConfirmCompleteModal';
 import { Frequency, frequencyLabels } from '@/lib/database.types';
 import { calculateNextDueDate, formatDate } from '@/lib/scheduling';
 import { CalendarDays, Timer, ChevronRight, ChevronLeft, Check, Home as HomeIcon } from 'lucide-react';
@@ -101,6 +102,7 @@ export default function CalendarPage() {
   const [selectedDate, setSelectedDate] = useState(() => new Date().toISOString().split('T')[0]);
   const [activeTask, setActiveTask] = useState<TaskEventItem | null>(null);
   const [isTimerVisible, setIsTimerVisible] = useState(false);
+  const [confirmTask, setConfirmTask] = useState<TaskEventItem | null>(null);
 
   const fetchEvents = useCallback(async (startDate: Date, endDate: Date, silent = false) => {
     if (!user) { setLoading(false); return; }
@@ -184,6 +186,18 @@ export default function CalendarPage() {
     setTasks(prev => prev.map(t => (t.id === taskId || t.user_task_id === taskId) ? { ...t, ...updates } : t));
     if (activeTask?.id === taskId || activeTask?.user_task_id === taskId) {
       setActiveTask(prev => prev ? { ...prev, ...updates } : null);
+    }
+  };
+
+  const handleCircleClick = (task: TaskEventItem) => {
+    if (task.status === 'completed') {
+      handleToggleStatus(task);   // un-complete: no confirmation needed
+      return;
+    }
+    if (task.frequency) {
+      setConfirmTask(task);       // recurring pending→complete: show modal
+    } else {
+      handleToggleStatus(task);   // one-time: no confirmation
     }
   };
 
@@ -277,7 +291,7 @@ export default function CalendarPage() {
                   >
                     <div className="flex items-center justify-between p-3 pr-4 rounded-[1.25rem] bg-surface-light dark:bg-surface-dark border border-gray-100 dark:border-gray-800">
                       <button
-                        onClick={() => handleToggleStatus(task)}
+                        onClick={() => handleCircleClick(task)}
                         className="w-10 h-10 flex items-center justify-center -ml-2 mr-1 active:opacity-50 flex-shrink-0"
                       >
                         <span className="w-6 h-6 rounded-full border-2 border-gray-300 dark:border-gray-600 block" />
@@ -366,6 +380,19 @@ export default function CalendarPage() {
           household={household}
           members={householdMembers}
           onTaskUpdate={handleTaskUpdate}
+        />
+      )}
+
+      {confirmTask && (
+        <ConfirmCompleteModal
+          isVisible={!!confirmTask}
+          taskName={confirmTask.name}
+          frequency={confirmTask.frequency as Frequency}
+          preferredWeekday={confirmTask.preferred_weekday}
+          currentDueDate={confirmTask.due_date}
+          room={confirmTask.room}
+          onConfirm={() => { handleToggleStatus(confirmTask); setConfirmTask(null); }}
+          onCancel={() => setConfirmTask(null)}
         />
       )}
     </div>
